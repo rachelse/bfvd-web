@@ -25,7 +25,9 @@ def manipulate_filename(filename):
     else:
         # If "_unrelaxed" not found, remove the extension
         id_part = os.path.splitext(base_filename)[0]
-    new_filename = id_part + '.pdb.gz'
+
+    suffix = base_filename.split('.')[-1] # pdb or cif
+    new_filename = id_part + f".{suffix}.gz"
     return new_filename, id_part
 
 def compress_file(args):
@@ -75,6 +77,9 @@ def main():
         for result in tqdm(pool.imap_unordered(compress_file, files_to_process), 
                            total=len(files_to_process), desc="Compressing files", unit="file"):
             results.append(result)
+
+    # Sort the results by the original file name (TODO: need to test)
+    results.sort(key=lambda x: x[0])
     
     # Now, write the compressed files to a new tar file
     # and write the index file with a progress bar
