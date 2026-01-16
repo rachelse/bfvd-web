@@ -29,7 +29,7 @@ console.timeLog();
 
 console.log('Loading SQL...')
 const sql = await open({
-    filename: dataPath + '/afdb-clusters.sqlite3',
+    filename: dataPath + '/toydb.sqlite3',// '/afdb-clusters.sqlite3',
     driver: sqlite3.Database,
     mode: sqlite3.OPEN_READONLY,
 })
@@ -43,14 +43,14 @@ checkpoints.push(aaDb.make(dataPath + '/afdb', dataPath + '/afdb.index'));
 const caDb = new DbReader();
 checkpoints.push(caDb.make(dataPath + '/afdb_ca', dataPath + '/afdb_ca.index'));
 
-const plddtDB = new DbReader();
-checkpoints.push(plddtDB.make(dataPath + '/afdb_plddt', dataPath + '/afdb_plddt.index'));
+// const plddtDB = new DbReader();
+// checkpoints.push(plddtDB.make(dataPath + '/afdb_plddt', dataPath + '/afdb_plddt.index'));
 
 const descDB = new DbReader();
 checkpoints.push(descDB.make(dataPath + '/afdb_desc', dataPath + '/afdb_desc.index'));
 
-const avaDb = new DbReader();
-checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
+// const avaDb = new DbReader();
+// checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
 
 let warnDB = null;
 if (existsSync(dataPath + '/warning_db')) {
@@ -349,11 +349,13 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
 });
 
 app.get('/api/:query', async (req, res) => {
-    let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.rep_accession == c.rep_accession WHERE m.accession = ?", req.params.query);
+    // let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.accession = ?", req.params.query);
+    let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.uniprot_id1 = ? OR m.uniprot_id2 = ?", req.params.query, req.params.query);
     if (!result || result.lca_tax_id == null) {
         res.status(404).send({ error: "No cluster found" });
         return;
     }
+    console.log("RACHEL: Fetched cluster for query ", req.params.query, ": ", result);
     result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
     res.send([ result ]);
 });
@@ -482,39 +484,42 @@ app.get('/api/cluster/:cluster/sankey-members', async (req, res) => {
         FROM member
         WHERE rep_accession == ?;
     `, cluster);
-    res.send({result: makeSankey(result)});
+    // res.send({result: makeSankey(result)}); // RACHEL: TODO
 });
 
-app.get('/api/cluster/:cluster/sankey-similars', async (req, res) => {
-    const cluster = req.params.cluster;
-    const avaKey = avaDb.id(cluster);
-    if (avaKey.found == false) {
-        res.send([]);
-        return;
-    }
-    const ava = avaDb.data(avaKey.value).toString('ascii');
-    let ids_evalue = ava.split('\n').map((x) => x.split(' '));
-    ids_evalue.splice(-1);
-    const accessions = ids_evalue.map((x) => x[0]).filter((x) => x != cluster);
-    let result = await sql.all(`
-    SELECT DISTINCT lca_tax_id as tax_id
-        FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
-    `, accessions);
-    res.send({result: makeSankey(result)});
-});
+// app.get('/api/cluster/:cluster/sankey-similars', async (req, res) => {
+//     const cluster = req.params.cluster;
+//     const avaKey = avaDb.id(cluster);
+//     if (avaKey.found == false) {
+//         res.send([]);
+//         return;
+//     }
+//     const ava = avaDb.data(avaKey.value).toString('ascii');
+//     let ids_evalue = ava.split('\n').map((x) => x.split(' '));
+//     ids_evalue.splice(-1);
+//     const accessions = ids_evalue.map((x) => x[0]).filter((x) => x != cluster);
+//     let result = await sql.all(`
+//     SELECT DISTINCT lca_tax_id as tax_id
+//         FROM cluster
+//         WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+//     `, accessions);
+//     res.send({result: makeSankey(result)});
+// });
 
 app.get('/api/cluster/:cluster', async (req, res) => {
-    let result = await sql.get("SELECT * FROM cluster as c LEFT JOIN member as m ON c.rep_accession == m.accession WHERE c.rep_accession = ?", req.params.cluster);
+    let result = await sql.get("SELECT * FROM cluster as c LEFT JOIN member as m ON c.intclu_rep_accession == m.accession WHERE c.intclu_rep_accession = ?", req.params.cluster);
     if (!result) {
         res.status(404).send({ error: "No cluster found" });
         return;
     }
     result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
     result.lineage = tree.nodeExists(result.lca_tax_id.id) ? tree.lineage(result.lca_tax_id) : null;
-    result.tax_id = tree.nodeExists(result.tax_id) ? tree.getNode(result.tax_id) : null;
-    result.rep_lineage = tree.nodeExists(result.tax_id.id) ? tree.lineage(result.tax_id) : null;
-    result.description = getDescription(result.rep_accession);
+    result.tax_id1 = tree.nodeExists(result.tax_id1) ? tree.getNode(result.tax_id1) : null;
+    result.tax_id2 = tree.nodeExists(result.tax_id2) ? tree.getNode(result.tax_id2) : null;
+    result.rep_lineage1 = tree.nodeExists(result.tax_id1.id) ? tree.lineage(result.tax_id1) : null;
+    result.rep_lineage2 = tree.nodeExists(result.tax_id2.id) ? tree.lineage(result.tax_id2) : null;
+    result.description = getDescription(result.rep_accession); // TODO
+
     if (warnDB) {
         const warnKey = warnDB.id(result.rep_accession);
         result.warning = warnKey.found;
@@ -535,6 +540,7 @@ function processAndWriteInChunks(data, chunkSize, processingFunc, writeFunc) {
 }
 
 app.get('/api/cluster/:cluster/members', async (req, res) => {
+    // RACHEL: DOING
     let flagFilter = '';
     let args = [ req.params.cluster ];
     if (req.query.flagFilter != null) {
@@ -637,7 +643,7 @@ app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
     let result = await sql.all(`
         SELECT tax_id
             FROM member
-            WHERE rep_accession = ?;
+            WHERE intclu_rep_accession = ?;
         `, req.params.cluster); 
     let suggestions = {};
     let count = 0;
@@ -817,17 +823,17 @@ app.get('/api/structure/:structure', async (req, res) => {
         throw Error(f`${structure} not found in ca db`);
     }
 
-    const plddtKey = plddtDB.id(structure);
-    if (plddtKey.found == false) {
-        throw Error(f`${structure} not found in plddt db`);
-    }
-    const plddt = plddtDB.data(plddtKey.value).toString('ascii');
+    // const plddtKey = plddtDB.id(structure);
+    // if (plddtKey.found == false) {
+    //     throw Error(f`${structure} not found in plddt db`);
+    // }
+    // const plddt = plddtDB.data(plddtKey.value).toString('ascii');
 
     const size = caDb.length(key.value);
     const aa = aaDb.data(aaKey.value).toString('ascii');
     const ca = caDb.data(key.value);
     const result = Array.from(read(ca, aaLength, size)).map((x) => x.toFixed(3));
-    res.send({ seq: aa, coordinates: result, plddt: plddt });
+    res.send({ seq: aa, coordinates: result, plddt: null });
 });
 
 app.use((err, req, res, next) => {

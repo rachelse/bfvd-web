@@ -11,6 +11,8 @@ resources/
 backend/.cache/
 .vscode/
 
+data/interfacedb/*
+data/obsolete/*
 data/taxdump.tar.gz
 data/*.dmp
 data/gc.prt

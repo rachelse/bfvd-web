@@ -4,7 +4,7 @@
     <v-flex xs12 md8>
     <panel>
         <template slot="header" v-if="response">
-            Cluster: {{ response ? response.rep_accession : "Loading..." }}
+            Cluster: {{ response ? response.intclu_rep_accession : "Loading..." }}
         </template>
 
         <template v-if="response && response.warning == true" slot="toolbar-extra">
@@ -19,7 +19,7 @@
                     Accession
                 </dt>
                 <dd>
-                    <ExternalLinks :accession="response.rep_accession"></ExternalLinks><br>
+                    <ExternalLinks :accession="response.intclu_rep_accession"></ExternalLinks><br>
                     {{ response.description }}
                 </dd>
                 </div>
@@ -43,8 +43,8 @@
                 <dt>
                     Taxonomy
                 </dt>
-                <dd>
-                    <template v-for="(taxonomy, index) in response.rep_lineage" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage.length -1)"> &#187;&nbsp;</template></template>
+                <dd> <!--RACHEL TODO-->
+                    <template v-for="(taxonomy, index) in response.rep_lineage1" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></template>
                 </dd>
                 </div>
                 </dl>
@@ -58,7 +58,7 @@
                             </span>
                         </template>
                         <span>
-                            These values are computed among the members with the <strong>clustered step</strong> AFDB/Foldseek.
+                            TODO
                         </span>
                     </v-tooltip>
                 </h3>
@@ -130,7 +130,7 @@
         <template slot="content" v-if="response">
             <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
         </template>
-p    </Panel>
+    </Panel>
     </v-flex>
 
     <v-flex xs12>
@@ -172,6 +172,7 @@ export default {
         }
     },
     mounted() {
+        console.log("RACHEL: mounted Cluster.vue with cluster ", this.$route.params.cluster);
         this.fetchData();
     },
     watch: {

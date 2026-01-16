@@ -1,8 +1,8 @@
 {
-  "name": "afdb_clusters",
-  "productName": "AFDB Clusters",
+  "name": "interface_clusters",
+  "productName": "Interface Clusters",
   "version": "0.0.0",
-  "author": "Milot Mirdita <milot@mirdita.de>",
+  "author": "Milot Mirdita <milot@mirdita.de>, Rachel Seongeun Kim <seamustard52@gmail.com>",
   "description": "",
   "repository": "",
   "license": "GPL-3.0-or-later",

@@ -4,7 +4,7 @@
             <v-flex xs12 pa-0 >
                 <v-parallax
                     :height="windowHeight"
-                    :src="require('./assets/bg-bg.jpg')"
+                    :src="require('./assets/bg-tmp2.png')"
                     dark
                 >
                     <v-row
@@ -17,11 +17,11 @@
                             cols="12"
                         >
                             <h1 class="text-h4 font-weight-thin mb-4">
-                                AlphaFold Clusters
+                                Interface Clusters
                             </h1>
-                            <h4 class="subheading">
+                            <!-- <h4 class="subheading"> # TODO
                                 Investigate the <a href="https://foldseek.com" target="_blank" rel="noopener">Foldseek</a> clustered <a href="https://alphafold.ebi.ac.uk" target="_blank" rel="noopener">AlphaFold database</a>
-                            </h4>
+                            </h4> -->
                             
                             <br>
                              
@@ -34,8 +34,8 @@
                                 dark
                             >
                                 <v-tab>UniProt</v-tab>
-                                <v-tab>Gene Ontology</v-tab>
-                                <v-tab>Taxonomy</v-tab>
+                                <!-- <v-tab>Gene Ontology</v-tab>
+                                <v-tab>Taxonomy</v-tab> -->
                                 <v-tab>Structure</v-tab>
                             </v-tabs>
                             <v-tabs-items v-model="tab" style="padding: 1em;">
@@ -59,7 +59,7 @@
                                     
                                     <template>
                                         <h2 class="text-h6 mb-2">
-                                            Examples
+                                            Examples: TODO
                                         </h2>
                                         <v-chip-group
                                             column
@@ -75,7 +75,7 @@
                                         </v-chip-group>
                                     </template>
                                 </v-tab-item>
-                                <v-tab-item>
+                                <!-- <v-tab-item>
                                     <GoAutocomplete
                                         :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
                                         v-model="queryGo"
@@ -98,8 +98,8 @@
                                         <v-radio name="goSearchType" label="Include lower GO lineage" value="lower" dark></v-radio>
                                         <v-radio name="goSearchType" label="Exact GO term" value="exact" dark ></v-radio>
                                     </v-radio-group>
-                                </v-tab-item>
-                                <v-tab-item>
+                                </v-tab-item> -->
+                                <!-- <v-tab-item>
                                     <TaxonomyNcbiSearch
                                         :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
                                         @click:append="searchLCA"
@@ -118,7 +118,7 @@
                                         <v-radio name="lcaSearchType" label="Include lower LCA lineage" value="lower" dark></v-radio>
                                         <v-radio name="lcaSearchType" label="Exact LCA identifier" value="exact" dark ></v-radio>
                                     </v-radio-group>
-                                </v-tab-item>
+                                </v-tab-item> -->
                                 <v-tab-item>
                                     <FoldseekSearchButton @response="searchFoldseek($event)" dark></FoldseekSearchButton>
                                 </v-tab-item>
@@ -127,11 +127,11 @@
                     </v-row>
                 </v-parallax>
             </v-flex>
-            <GoSearchResult v-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult>
+            <!-- <GoSearchResult v-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult>
             <LCASearchResult v-else-if="tab == 2" @total="small = $event > 0; inSearch = false;"></LCASearchResult>
-            <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult>
+            <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult> -->
             <v-flex>
-                <v-card rounded="0">
+                <v-card flat>
                     <v-flex>
                     <v-card-title primary-title class="pb-0 mb-0">
                         <div class="text-h5 mb-0">Reference</div>
@@ -139,9 +139,10 @@
                     <v-card-title primary-title class="pt-0 mt-0">
                         
                         <p class="text-subtitle-1 mb-0" style="word-break: break-word;">
-                            Barrio-Hernandez&nbsp;I, Yeo&nbsp;J, Jänes&nbsp;J, Mirdita&nbsp;M, Gilchrist&nbsp;CLM, Wein&nbsp;T, Varadi&nbsp;M, Velankar&nbsp;S, Beltrao&nbsp;P, Steinegger&nbsp;M. 
+                            TODO
+                            <!-- Barrio-Hernandez&nbsp;I, Yeo&nbsp;J, Jänes&nbsp;J, Mirdita&nbsp;M, Gilchrist&nbsp;CLM, Wein&nbsp;T, Varadi&nbsp;M, Velankar&nbsp;S, Beltrao&nbsp;P, Steinegger&nbsp;M. 
                             <a href="https://nature.com/articles/s41586-023-06510-w" target="_blank" rel="noopener">Clustering predicted structures at the scale of the known protein universe.</a>
-                            Nature,&nbsp;2023.
+                            Nature,&nbsp;2023. -->
                         </p>
                     </v-card-title>
                     </v-flex>
@@ -149,19 +150,17 @@
 
                 <p class="text-subtitle-1 mb-0 collab">
                     AFDB Clusters is a collaboration between
-                    <a href="https://en.snu.ac.kr/">Seoul National University</a>, the
-                    <a href="https://www.ebi.ac.uk/">European Bioinformatics Institute</a>, <br>and the
-                    <a href="https://www.sib.swiss/">Swiss Institute of Bioinformatics</a>.
+                    <a href="https://en.snu.ac.kr/">Seoul National University</a> and the
+                    <a href="https://www.imb.de/">Institue of Molecular Biology Mainz</a>
+                    <!-- <a href="https://www.ebi.ac.uk/">European Bioinformatics Institute</a>, <br>and the -->
+                    <!-- <a href="https://www.sib.swiss/">Swiss Institute of Bioinformatics</a>. -->
                 </p>
                 <div style="text-align: center; padding-top: 12px; padding-bottom: 40px;">
                     <a style="margin: 12px" rel="external noopener" target="_blank" href="https://en.snu.ac.kr/" height="128">
                         <img class="logos" src="./assets/snu_logo_opt.svg" height="64"/>
                     </a>
-                    <a style="margin: 12px" rel="external noopener" target="_blank" href="https://www.ebi.ac.uk/" height="128">
-                        <img class="logos" src="./assets/embl_logo.svg" height="64"/>
-                    </a>
-                    <a style="margin: 12px" rel="external noopener" target="_blank" href="https://www.sib.swiss/" height="128">
-                        <img class="logos" src="./assets/logo_sib.svg" height="64"/>
+                    <a style="margin: 12px" rel="external noopener" target="_blank" href="https://www.imb.de/" height="128">
+                        <img class="logos" src="./assets/imb_logo.png" height="64"/>
                     </a>
                 </div>
             </v-flex>
@@ -192,15 +191,15 @@ export default {
     data() {
         return {
             tab: 0,
-            query: "B4DKH6",
+            query: "TODO",
             selectedExample: 1,
-            examples: [
-                {id:'A0A849TG76', desc:'predicted \'Transporter\' protein'},
-                {id:'B4DKH6', desc:'Bactericidal permeability-increasing protein'},
-                {id:'A0A1G5ASE0', desc:'Histone (bacteria)'},
-                {id:'A0A1S3QU81', desc:' Gasdermin containing domain'},
+            examples: [ // TODO
+                {id:'TODO', desc:'predicted \'Transporter\' protein'},
+                // {id:'B4DKH6', desc:'Bactericidal permeability-increasing protein'},
+                // {id:'A0A1G5ASE0', desc:'Histone (bacteria)'},
+                // {id:'A0A1S3QU81', desc:' Gasdermin containing domain'},
             ],
-            queryGo: { text: "immune response", value: "GO:0006955" },
+            queryGo: { text: "TODO", value: "TODO" },
             goSearchType: "lower",
             queryLCA: { text: "Homo sapiens", value: "9606", common_name: "human" },
             lcaSearchType: "lower",
@@ -252,7 +251,7 @@ export default {
             this.error = null;
             this.$axios.get("/" + this.query)
                 .then(response => {
-                    this.$router.push({ name: 'cluster', params: { cluster: response.data[0].rep_accession } })
+                    this.$router.push({ name: 'cluster', params: { cluster: response.data[0].intclu_rep_accession } })
                 })
                 .catch((err) => {
                     if (err.response && err.response.data && err.response.data.error) {
@@ -365,7 +364,7 @@ code {
 }
 
 .marv-bg-fg {
-    background: url('./assets/bg-fg.png');
+    /* background: url('./assets/bg-fg.png'); */ /* TODO */
     background-size: 100% auto;
     background-repeat: no-repeat;
     background-attachment: fixed;

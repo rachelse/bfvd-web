@@ -6,14 +6,21 @@
 
 sqlite3 $1 << EOF
 CREATE TABLE member (
-	accession TEXT PRIMARY KEY,
-	rep_accession TEXT,
-	tax_id TEXT,
-	flag INTEGER
+	accession INTEGER PRIMARY KEY,
+	diclu_rep_accession INTEGER,
+	intclu_rep_accession INTEGER,
+	tax_id1 TEXT,
+	tax_id2 TEXT,
+	flag INTEGER,
+	uniprot_id1 TEXT,
+	uniprot_id2 TEXT,
+	pdb_id TEXT,
+	chain1 TEXT,
+	chain2 TEXT
 );
 
 CREATE TABLE cluster (
-	rep_accession TEXT PRIMARY KEY,
+	intclu_rep_accession INTEGER PRIMARY KEY,
 	rep_len INTEGER,
 	rep_plddt REAL,
 	is_dark BOOLEAN,
@@ -34,14 +41,21 @@ PRAGMA max_page_limit=13107200;
 .mode tabs
 
 CREATE TABLE tmpMember (
-	rep_id TEXT,
-	mem_id TEXT,
+	intclu_id INTEGER,
+	diclu_id INTEGER,
+	mem_id INTEGER,
 	flag INTEGER,
-	tax_id INTEGER
+	tax_id1 TEXT,
+	tax_id2 TEXT,
+	pdb_id TEXT,
+	chain1 TEXT,
+	chain2 TEXT,
+	uniprot_id1 TEXT,
+	uniprot_id2 TEXT
 );
 
 CREATE TABLE tmpCluster (
-	rep_id TEXT,
+	rep_id INTEGER,
 	is_dark BOOLEAN,
 	n_mem INTEGER,
 	rep_len INTEGER,
@@ -56,19 +70,13 @@ CREATE TABLE tmpCluster (
 
 -- Process names
 UPDATE tmpMember
-SET rep_id = REPLACE(rep_id, 'AF-', ''),
-    mem_id = REPLACE(mem_id, 'AF-', '');
-UPDATE tmpMember
-SET rep_id = REPLACE(rep_id, '-F1-model_v3.cif', ''),
-    mem_id = REPLACE(mem_id, '-F1-model_v3.cif', '');
-UPDATE tmpCluster
-SET rep_id = REPLACE(rep_id, 'AF-', '');
-UPDATE tmpCluster
-SET rep_id = REPLACE(rep_id, '-F1-model_v3.cif', '');
+SET pdb_id = SUBSTR(pdb_id, 1, INSTR(pdb_id, '-assembly') - 1);
 
 -- Insert members & index on accession
-INSERT INTO member (accession, rep_accession, flag, tax_id)
-SELECT mem_id, rep_id, flag, tax_id
+INSERT INTO member (accession, diclu_rep_accession, intclu_rep_accession, flag, 
+					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2)
+SELECT mem_id, diclu_id, intclu_id, flag, 
+		tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2
 FROM tmpMember;
 
 -- Index on member accessions
@@ -77,16 +85,22 @@ ON member(accession);
 
 -- Index on member representative accessions
 CREATE INDEX member_rep_idx
-ON member(rep_accession);
+ON member(intclu_rep_accession);
+
+-- Index on UniProt IDs
+CREATE INDEX member_uniprot1_idx
+ON member(uniprot_id1);
+CREATE INDEX member_uniprot2_idx
+ON member(uniprot_id2);
 
 -- Insert clusters
-INSERT INTO cluster (rep_accession, is_dark, n_mem, rep_len, avg_len, rep_plddt, avg_plddt, lca_tax_id)
+INSERT INTO cluster (intclu_rep_accession, is_dark, n_mem, rep_len, avg_len, rep_plddt, avg_plddt, lca_tax_id)
 SELECT rep_id, is_dark, n_mem, rep_len, avg_len, rep_plddt, avg_plddt, lca_tax_id
 FROM tmpCluster;
 
 -- Index on cluster representative accessions
 CREATE INDEX cluster_rep_idx
-ON cluster(rep_accession);
+ON cluster(intclu_rep_accession);
 
 -- Index on cluster lca tax id
 CREATE INDEX cluster_lca_tax_id_idx
