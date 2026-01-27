@@ -66,5 +66,9 @@ main.content {
 }
 
 .theme--dark.v-card, .theme--dark.v-data-table, .theme--dark.v-sheet {
-    background-color: #2e2e2e;
+    background-color: #000000;
+}
+
+.v-application {
+    background: transparent/*#000000 !important;*/
 }

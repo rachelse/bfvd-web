@@ -16,7 +16,9 @@ CREATE TABLE member (
 	uniprot_id2 TEXT,
 	pdb_id TEXT,
 	chain1 TEXT,
-	chain2 TEXT
+	chain2 TEXT,
+	chain1_id INTEGER,
+	chain2_id INTEGER
 );
 
 CREATE TABLE cluster (
@@ -45,13 +47,15 @@ CREATE TABLE tmpMember (
 	diclu_id INTEGER,
 	mem_id INTEGER,
 	flag INTEGER,
-	tax_id1 TEXT,
-	tax_id2 TEXT,
+	tax_id1 INTEGER,
+	tax_id2 INTEGER,
 	pdb_id TEXT,
 	chain1 TEXT,
 	chain2 TEXT,
 	uniprot_id1 TEXT,
-	uniprot_id2 TEXT
+	uniprot_id2 TEXT,
+	chain1_id INTEGER,
+	chain2_id INTEGER
 );
 
 CREATE TABLE tmpCluster (
@@ -74,9 +78,9 @@ SET pdb_id = SUBSTR(pdb_id, 1, INSTR(pdb_id, '-assembly') - 1);
 
 -- Insert members & index on accession
 INSERT INTO member (accession, diclu_rep_accession, intclu_rep_accession, flag, 
-					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2)
+					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2, chain1_id, chain2_id)
 SELECT mem_id, diclu_id, intclu_id, flag, 
-		tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2
+		tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2, chain1_id, chain2_id
 FROM tmpMember;
 
 -- Index on member accessions

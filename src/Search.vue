@@ -4,7 +4,7 @@
             <v-flex xs12 pa-0 >
                 <v-parallax
                     :height="windowHeight"
-                    :src="require('./assets/bg-tmp2.png')"
+                    :src="require('./assets/bg-tmp3.png')"
                     dark
                 >
                     <v-row
@@ -16,7 +16,7 @@
                             class="text-center"
                             cols="12"
                         >
-                            <h1 class="text-h4 font-weight-thin mb-4">
+                            <h1 class="text-h3 font-weight-light mb-4">
                                 Interface Clusters
                             </h1>
                             <!-- <h4 class="subheading"> # TODO
@@ -214,7 +214,7 @@ export default {
             if (this.small && !this.tab == 0) {
                 return 500;
             }
-            return Math.max(Math.min(860, (window.innerHeight - 48) * 0.8), 500);
+            return Math.max(Math.min(920, (window.innerHeight - 48) * 0.9), 500);
         },
     },
     mounted() {
@@ -364,10 +364,10 @@ code {
 }
 
 .marv-bg-fg {
-    /* background: url('./assets/bg-fg.png'); */ /* TODO */
-    background-size: 100% auto;
+    /* background: url('./assets/bg-fg-tmp1.png'); /* /* TODO */
+    background-size: 98% 90%;
     background-repeat: no-repeat;
-    background-attachment: fixed;
+    background-attachment: scroll;
     background-position: center center;
 }
 
@@ -378,7 +378,7 @@ code {
 
 .collab {
     text-align: center;
-    padding-top: 40px;
+    padding-top: 20px;
     font-weight: lighter;
     line-height: 1.2;
 }
