@@ -16,16 +16,24 @@
             <dl class="dl-3">
                 <div>
                 <dt>
-                    Accession
+                    UniProt Accession
                 </dt>
                 <dd>
-                    <ExternalLinks :accession="response.intclu_rep_accession"></ExternalLinks><br>
+                    <ExternalLinks :accession="response.uniprot_id1+':'+response.uniprot_id2"></ExternalLinks><br>
                     {{ response.description }}
                 </dd>
                 </div>
                 <div>
                 <dt>
-                    Length
+                    PDB
+                </dt>
+                <dd>
+                    <ExternalLinks :accession="response.pdb_id"></ExternalLinks>
+                </dd>
+                </div>
+                <!-- <div> // RACHEL: Probably don't need length and pLDDT for representative summary
+                <dt>
+                    Length 
                 </dt>
                 <dd>
                     {{ response.rep_len }} aa
@@ -38,13 +46,14 @@
                 <dd>
                     {{ response.rep_plddt.toFixed(2) }}
                 </dd>
-                </div>
+                </div> -->
                 <div style=" grid-area: 2 / 1 / 3 / 4;">
                 <dt>
                     Taxonomy
                 </dt>
                 <dd> <!--RACHEL TODO-->
                     <template v-for="(taxonomy, index) in response.rep_lineage1" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></template>
+                    <template v-for="(taxonomy, index) in response.rep_lineage2" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></template>
                 </dd>
                 </div>
                 </dl>
@@ -128,7 +137,7 @@
             Representative structure
         </template>
         <template slot="content" v-if="response">
-            <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
+            <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" :chain1_id="response.chain1_id" :chain2_id="response.chain2_id" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
         </template>
     </Panel>
     </v-flex>
@@ -137,9 +146,9 @@
         <Members :cluster="$route.params.cluster" @select="(accession) => second = accession"></Members>
     </v-flex>
 
-    <v-flex xs12>
+    <!-- <v-flex xs12>
         <Similars :cluster="$route.params.cluster" @select="(accession) => second = accession"></Similars>
-    </v-flex>
+    </v-flex> -->
 </v-row>
 </template>
 
@@ -172,7 +181,6 @@ export default {
         }
     },
     mounted() {
-        console.log("RACHEL: mounted Cluster.vue with cluster ", this.$route.params.cluster);
         this.fetchData();
     },
     watch: {

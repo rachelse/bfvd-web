@@ -89,7 +89,7 @@ app.use((req, res, next) => {
 const fileCache = new FileCache(cachePath);
 
 function finalizeResult(result, req, res) {
-    const is_tax_filter = req.query.tax_id != undefined;
+    const is_tax_filter = req.query.tax_id1 != undefined;
     const taxonomy_suggest = req.params.taxonomy;
 
     if (typeof(taxonomy_suggest) != "undefined") {
@@ -130,7 +130,7 @@ function finalizeResult(result, req, res) {
             }
             let currNode = tree.getNode(x.lca_tax_id.id);
             while (currNode.id != 1) {
-                if (currNode.id == req.query.tax_id) {
+                if (currNode.id == req.query.tax_id1) {
                     return true;
                 }
                 currNode = tree.getNode(currNode.parent);
@@ -355,7 +355,6 @@ app.get('/api/:query', async (req, res) => {
         res.status(404).send({ error: "No cluster found" });
         return;
     }
-    console.log("RACHEL: Fetched cluster for query ", req.params.query, ": ", result);
     result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
     res.send([ result ]);
 });
@@ -416,10 +415,10 @@ function makeSankey(result) {
     let links = {};
     const allowedRanks = [28, 27, 24, 12, 8, 4];
     result.forEach((x) => {
-        if (tree.nodeExists(x.tax_id) == false) {
+        if (tree.nodeExists(x.tax_id1) == false) {
             return;
         }
-        let node = tree.getNode(x.tax_id, true);
+        let node = tree.getNode(x.tax_id1, true);
         while (node.id != 1) {
             let currentNode = node;
             // skip all ranks except superkingdom, phylum, class, order, family, genus
@@ -480,9 +479,9 @@ function makeSankey(result) {
 app.get('/api/cluster/:cluster/sankey-members', async (req, res) => {
     const cluster = req.params.cluster;
     let result = await sql.all(`
-    SELECT tax_id
+    SELECT tax_id1
         FROM member
-        WHERE rep_accession == ?;
+        WHERE intclu_rep_accession == ?;
     `, cluster);
     // res.send({result: makeSankey(result)}); // RACHEL: TODO
 });
@@ -513,7 +512,8 @@ app.get('/api/cluster/:cluster', async (req, res) => {
         return;
     }
     result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
-    result.lineage = tree.nodeExists(result.lca_tax_id.id) ? tree.lineage(result.lca_tax_id) : null;
+    // FIXME: RACHEL tree.nodeExists(result.lca_tax_id.id) says false
+    // result.lineage = tree.nodeExists(result.lca_tax_id.id) ? tree.lineage(result.lca_tax_id) : null;
     result.tax_id1 = tree.nodeExists(result.tax_id1) ? tree.getNode(result.tax_id1) : null;
     result.tax_id2 = tree.nodeExists(result.tax_id2) ? tree.getNode(result.tax_id2) : null;
     result.rep_lineage1 = tree.nodeExists(result.tax_id1.id) ? tree.lineage(result.tax_id1) : null;
@@ -540,7 +540,7 @@ function processAndWriteInChunks(data, chunkSize, processingFunc, writeFunc) {
 }
 
 app.get('/api/cluster/:cluster/members', async (req, res) => {
-    // RACHEL: DOING
+    // RACHEL: DOING Implement for tax_id2 as well
     let flagFilter = '';
     let args = [ req.params.cluster ];
     if (req.query.flagFilter != null) {
@@ -552,22 +552,22 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
 
     let result;
     let total = 0;
-    if (req.query.tax_id) {
+    if (req.query.tax_id1) {
         result = await sql.all(`
-        SELECT accession, tax_id, flag
+        SELECT accession, tax_id1, flag
             FROM member
-            WHERE rep_accession = ? ${flagFilter}
+            WHERE intclu_rep_accession = ? ${flagFilter}
             ORDER BY rowid;
         `, ...args);
         
         result = result.filter((x) => {
-            if (tree.nodeExists(x.tax_id) == false) {
+            if (tree.nodeExists(x.tax_id1) == false) {
                 return false;
             }
-            x.tax_id = tree.getNode(x.tax_id);
-            let currNode = x.tax_id;
+            x.tax_id1 = tree.getNode(x.tax_id1);
+            let currNode = x.tax_id1;
             while (currNode.id != 1) {
-                if (currNode.id == req.query.tax_id) {
+                if (currNode.id == req.query.tax_id1) {
                     return true;
                 }
                 currNode = tree.getNode(currNode.parent);
@@ -585,21 +585,21 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
     } else {
         let paginate_query = "";
         if (paginate) {
-            total = await sql.get(`SELECT COUNT(accession) as total FROM member WHERE rep_accession = ? ${flagFilter}`, ...args);
+            total = await sql.get(`SELECT COUNT(accession) as total FROM member WHERE intclu_rep_accession = ? ${flagFilter}`, ...args);
             total = total.total;
             args.push((req.query.itemsPerPage) | 0);
             args.push(((req.query.page - 1) * req.query.itemsPerPage) | 0);
             paginate_query = "LIMIT ? OFFSET ?";
         }
         result = await sql.all(`
-        SELECT accession, tax_id, flag
+        SELECT accession, tax_id1, flag
             FROM member
-            WHERE rep_accession = ? ${flagFilter}
+            WHERE intclu_rep_accession = ? ${flagFilter}
             ORDER BY rowid
             ${paginate_query};
         `, ...args);
         result.forEach((x) => {
-            x.tax_id = tree.nodeExists(x.tax_id) ? tree.getNode(x.tax_id) : null;
+            x.tax_id1 = tree.nodeExists(x.tax_id1) ? tree.getNode(x.tax_id1) : null;
             x.description = getDescription(x.accession);
         });
     }
@@ -627,7 +627,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             res.charset = 'UTF-8';
 
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(member => `>${member.accession} ${member.description.trimEnd()} OX=${member.tax_id ? member.tax_id.id : '0'} OS=${member.tax_id ? member.tax_id.name : 'unknown'} Flag=${member.flag}\n${aaDb.data(aaDb.id(member.accession).value).toString('ascii')}`).join(''),
+                chunk => chunk.map(member => `>${member.accession} ${member.description.trimEnd()} OX=${member.tax_id1 ? member.tax_id1.id : '0'} OS=${member.tax_id1 ? member.tax_id1.name : 'unknown'} Flag=${member.flag}\n${aaDb.data(aaDb.id(member.accession).value).toString('ascii')}`).join(''),
                 chunk => res.write(chunk));
 
             res.end();
@@ -641,7 +641,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
 
 app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
     let result = await sql.all(`
-        SELECT tax_id
+        SELECT tax_id1
             FROM member
             WHERE intclu_rep_accession = ?;
         `, req.params.cluster); 
@@ -649,10 +649,10 @@ app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
     let count = 0;
     
     result.forEach((x) => {
-        if (tree.nodeExists(x.tax_id) == false) {
+        if (tree.nodeExists(x.tax_id1) == false) {
             return;
         }
-        let node = tree.getNode(x.tax_id);
+        let node = tree.getNode(x.tax_id1);
         while (node.id != 1) {
             if (node.id in suggestions || count >= 10) {
                 break;
@@ -689,14 +689,14 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
         x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
     });
     // console.log(result)
-    if (req.query.tax_id) {
+    if (req.query.tax_id1) {
         result = result.filter((x) => {
             let currNode = x.lca_tax_id;
             if (currNode == null) {
                 return false;
             }
             while (currNode.id != 1) {
-                if (currNode.id == req.query.tax_id) {
+                if (currNode.id == req.query.tax_id1) {
                     return true;
                 }
                 currNode = tree.getNode(currNode.parent);

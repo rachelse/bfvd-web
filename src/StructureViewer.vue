@@ -141,14 +141,14 @@ const oneToThree = {
  * Follows the spacing spec from https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
  * Will have to change if/when swapping to fuller data
  */
-function mockPDB(ca, seq) {
+function mockPDB(ca, seq, chain) {
     const chainLength = ca.length / 3;
     const pdb = new Array()
     let j = 0;
     for (let i = 0; i < ca.length; i+=3, j++) {
         const line = 'ATOM  '
             + j.toString().padStart(5)
-            + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == (seq.length - 1) ? seq[i/3] : 'A'] + ' A'
+            + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == (seq.length - 1) ? seq[i/3] : 'A'] + ' ' + chain
             + j.toString().padStart(4)
             + '    '
             + ca[0 * chainLength + j].toString().padStart(8)
@@ -241,6 +241,8 @@ export default {
     props: {
         'cluster': { type: String, required: true },
         'second': { type: String, required: true },
+        'chain1_id': { type: Number, required: true },
+        'chain2_id': { type: Number, required: true },
         'toolbar': { type: Boolean, default: true },
         'bgColorLight': { type: String, default: "white" },
         'bgColorDark': { type: String, default: "#eee" },
@@ -324,7 +326,7 @@ END
         fetchStructure(accession) {
             return this.$axios.get("/structure/" + accession)
                 .then((response) => {
-                    const plddt = response.data.plddt;
+                    // const plddt = response.data.plddt;
                     return pulchra(mockPDB(response.data.coordinates, response.data.seq))
                         .then((pdb) => {
                             return this.stage.loadFile(new Blob([pdb], { type: 'text/plain' }), {ext: 'pdb', firstModelOnly: true})
@@ -336,6 +338,32 @@ END
                             return component;
                         })
                 })
+        },
+        fetchDimerStructure(accession1, accession2) {
+            return Promise.all([
+                this.$axios.get("/structure/" + accession1),
+                this.$axios.get("/structure/" + accession2)
+            ]).then(([r1, r2]) => {
+                return Promise.all([
+                    pulchra(mockPDB(r1.data.coordinates, r1.data.seq, 'A')),
+                    pulchra(mockPDB(r2.data.coordinates, r2.data.seq, 'B'))
+                ]);
+            }).then(async ([pdb1, pdb2]) => {
+                const fixChain = (pdb, chainId) => {
+                    return pdb.split('\n').map(line => {
+                        if (line.startsWith('ATOM')) {
+                            return line.slice(0, 21) + chainId + line.slice(22);
+                        } else {
+                            return line;
+                        }
+                    }).join('\n');
+                };
+                pdb1 = fixChain(pdb1, 'A');
+                pdb2 = fixChain(pdb2, 'B');
+                const filter = (p) => p.split('\n').filter(l => l.startsWith('ATOM') || l.startsWith('HETATM')).join('\n');
+                const combined = filter(pdb1) + '\n' + filter(pdb2); // Hack to concatenate two chains into one PDB
+                return this.stage.loadFile(new Blob([combined], { type: 'text/plain' }), {ext: 'pdb', firstModelOnly: false});
+            });
         }
     },
     computed: {
@@ -360,10 +388,11 @@ END
                         return;
                     }
                     this.stage.removeAllComponents();
-                    this.fetchStructure(this.cluster)
+                    
+                    this.fetchDimerStructure(this.chain1_id, this.chain2_id)
                         .then((component) => {
                             this.component = component;
-                            this.component.addRepresentation("cartoon", { color: discreteBfactor });
+                            this.component.addRepresentation("cartoon", { color: "chainname" });
                             this.stage.autoView();
                             return component;
                         })
