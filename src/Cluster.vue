@@ -12,51 +12,79 @@
         </template>
 
         <template slot="content" v-if="response">
-            <h3>Representative summary</h3>
-            <dl class="dl-3">
-                <div>
-                <dt>
-                    UniProt Accession
-                </dt>
-                <dd>
-                    <ExternalLinks :accession="response.uniprot_id1+':'+response.uniprot_id2"></ExternalLinks><br>
-                    {{ response.description }}
-                </dd>
+            <div>
+            <h3>
+                Representative PDB:
+                <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB"></ExternalLinks>
+            </h3>
+            </div>
+            <div class="d-flex">
+                <div class="flex-grow-1" style="width: 50%">
+                    <h4 style="margin-top:0.5em" align="center">
+                        Chain {{ response.chain1 }}
+                    </h4>
+                    <dl class="dl-2">
+                        <div>
+                        <dt>UniProt Accession</dt>
+                        <dd>
+                            <ExternalLinks :accession="response.uniprot_id1"></ExternalLinks><br>
+                            {{ response.description }}
+                        </dd>
+                        </div>
+                        <div>
+                        <dt>
+                            Taxonomy
+                            <v-btn icon x-small @click="showLineage1 = !showLineage1">
+                                <v-icon>{{ showLineage1 ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon>
+                            </v-btn>
+                        </dt>
+                        <dd>
+                            <div v-if="showLineage1 === false">
+                                {{ response.tax_id1.name }}
+                            </div>
+                            <div v-else>
+                                <span v-for="(taxonomy, index) in response.rep_lineage1" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></span>
+                            </div>
+                        </dd>
+                        </div>
+                    </dl>
                 </div>
-                <div>
-                <dt>
-                    PDB
-                </dt>
-                <dd>
-                    <ExternalLinks :accession="response.pdb_id"></ExternalLinks>
-                </dd>
+
+                <v-divider vertical class="mx-3"></v-divider>
+
+                <div class="flex-grow-1" style="width: 50%">
+                    <h4 style="margin-top:0.5em" align="center">
+                        Chain {{ response.chain2 }}
+                    </h4>
+                    
+                    <dl class="dl-2">
+                    <div>
+                        <dt>UniProt Accession</dt>
+                        <dd>
+                            <ExternalLinks :accession="response.uniprot_id2"></ExternalLinks><br>
+                            {{ response.description }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>
+                            Taxonomy
+                            <v-btn icon x-small @click="showLineage2 = !showLineage2">
+                                <v-icon>{{ showLineage2 ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon>
+                            </v-btn>
+                        </dt>
+                        <dd>
+                            <div v-if="showLineage2 === false">
+                                {{ response.tax_id2.name }}
+                            </div>
+                            <div v-else>
+                                <span v-for="(taxonomy, index) in response.rep_lineage2" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></span>
+                            </div>
+                        </dd>
+                    </div>
+                    </dl>
                 </div>
-                <!-- <div> // RACHEL: Probably don't need length and pLDDT for representative summary
-                <dt>
-                    Length 
-                </dt>
-                <dd>
-                    {{ response.rep_len }} aa
-                </dd>
-                </div>
-                <div>
-                <dt>
-                    pLDDT
-                </dt>
-                <dd>
-                    {{ response.rep_plddt.toFixed(2) }}
-                </dd>
-                </div> -->
-                <div style=" grid-area: 2 / 1 / 3 / 4;">
-                <dt>
-                    Taxonomy
-                </dt>
-                <dd> <!--RACHEL TODO-->
-                    <template v-for="(taxonomy, index) in response.rep_lineage1" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></template>
-                    <template v-for="(taxonomy, index) in response.rep_lineage2" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></template>
-                </dd>
-                </div>
-                </dl>
+
+            </div>
                 <v-divider  style="margin-top:0.5em"></v-divider>
                 <h3 style="margin-top:1em">
                     Cluster summary
@@ -82,26 +110,10 @@
                 </div>
                 <div>
                 <dt>
-                    Dark cluster
-                </dt>
-                <dd>
-                    {{ response.is_dark ? 'yes' : 'no' }}
-                </dd>
-                </div>
-                <div>
-                <dt>
                     Average length
                 </dt>
                 <dd>
                     {{ response.avg_len.toFixed(2) }} aa
-                </dd>
-                </div>
-                <div>
-                <dt>
-                    Average pLDDT
-                </dt>
-                <dd>
-                    {{ response.avg_plddt.toFixed(2) }}
                 </dd>
                 </div>
                 <div style=" grid-area: 2 / 1 / 3 / 5;">
@@ -112,13 +124,7 @@
                     <template v-for="(taxonomy, index) in response.lineage" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></template>
                 </dd>
                 </div>
-                <!-- <div style=" grid-area: 3 / 1 / 3 / 5;">
-                    <dt>Annotations</dt>
-                    <dd>
-                        <Annotations :cluster="$route.params.cluster"></Annotations>
-                    </dd>
-                </div> -->
-            </dl>
+                </dl>
             <template v-if="response && response.warning == true">
                 <v-divider  style="margin-top:0.5em"></v-divider>
                 <h3 style="margin-top:1em; color: #F44336; text-decoration: underline;">
@@ -178,6 +184,8 @@ export default {
             response: null,
             fetching: false,
             second: "",
+            showLineage1: false,
+            showLineage2: false,
         }
     },
     mounted() {
@@ -233,6 +241,9 @@ dl {
   padding-top: .25em;
   padding-bottom: 1em;
   grid-gap: 1em;
+}
+.dl-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .dl-3 {
