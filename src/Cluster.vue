@@ -12,93 +12,68 @@
         </template>
 
         <template slot="content" v-if="response">
-            <div>
-            <h3>
-                Representative PDB:
-                <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB"></ExternalLinks>
-            </h3>
+            <div class="d-flex align-center justify-space-between mb-2">
+                <h3>Representative PDB: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
             </div>
-            <div class="d-flex">
-                <div class="flex-grow-1" style="width: 50%">
-                    <h4 style="margin-top:0.5em" align="center">
-                        Chain {{ response.chain1 }}
-                    </h4>
-                    <dl class="dl-2">
-                        <div>
-                        <dt>UniProt Accession</dt>
-                        <dd>
-                            <ExternalLinks :accession="response.uniprot_id1"></ExternalLinks><br>
-                            {{ response.description }}
-                        </dd>
-                        </div>
-                        <div>
-                        <dt>
-                            Taxonomy
-                            <v-btn icon x-small @click="showLineage1 = !showLineage1">
-                                <v-icon>{{ showLineage1 ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon>
-                            </v-btn>
-                        </dt>
-                        <dd>
-                            <div v-if="showLineage1 === false">
-                                {{ response.tax_id1.name }}
-                            </div>
-                            <div v-else>
-                                <span v-for="(taxonomy, index) in response.rep_lineage1" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></span>
-                            </div>
-                        </dd>
-                        </div>
-                    </dl>
-                </div>
 
-                <v-divider vertical class="mx-3"></v-divider>
-
-                <div class="flex-grow-1" style="width: 50%">
-                    <h4 style="margin-top:0.5em" align="center">
-                        Chain {{ response.chain2 }}
-                    </h4>
-                    
-                    <dl class="dl-2">
-                    <div>
-                        <dt>UniProt Accession</dt>
-                        <dd>
-                            <ExternalLinks :accession="response.uniprot_id2"></ExternalLinks><br>
-                            {{ response.description }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>
-                            Taxonomy
-                            <v-btn icon x-small @click="showLineage2 = !showLineage2">
-                                <v-icon>{{ showLineage2 ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon>
-                            </v-btn>
-                        </dt>
-                        <dd>
-                            <div v-if="showLineage2 === false">
-                                {{ response.tax_id2.name }}
-                            </div>
-                            <div v-else>
-                                <span v-for="(taxonomy, index) in response.rep_lineage2" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></span>
-                            </div>
-                        </dd>
-                    </div>
-                    </dl>
-                </div>
-
-            </div>
-                <v-divider  style="margin-top:0.5em"></v-divider>
-                <h3 style="margin-top:1em">
-                    Cluster summary
-                    <v-tooltip top>
-                        <template v-slot:activator="{ on }">
-                            <span v-on="on">
-                                <v-icon v-on="on">{{ $MDI.HelpCircleOutline }}</v-icon>
-                            </span>
-                        </template>
-                        <span>
-                            TODO
+            <v-simple-table dense>
+                <template v-slot:default>
+                    <thead>
+                        <tr>
+                            <th class="text-left">Chain</th>
+                            <th class="text-left">UniProt</th>
+                            <th class="text-left">Taxonomy <v-button plain text small icon @click="showLineage = !showLineage"><v-icon small>{{ showLineage ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon></v-button></th>
+                            <th class="text-left">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="font-weight-bold">{{ response.chain1 }}</td>
+                            <td><ExternalLinks :accession="response.uniprot_id1" /></td>
+                            <td>
+                                <dd v-if="!showLineage">
+                                    {{ response.tax_id1.name }}
+                                </dd>
+                                <dd v-else>
+                                    <span v-for="(taxonomy, index) in response.rep_lineage1"><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></span>
+                                </dd>
+                            </td>
+                            <td class="caption grey--text text-truncate" style="max-width: 150px;">
+                                {{ response.description }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold">{{ response.chain2 }}</td>
+                            <td><ExternalLinks :accession="response.uniprot_id2" /></td>
+                            <td>
+                                <dd v-if="!showLineage">
+                                    {{ response.tax_id2.name }}
+                                </dd>
+                                <dd v-else>
+                                    <span v-for="(taxonomy, index) in response.rep_lineage2" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></span>
+                                </dd>
+                            </td>
+                            <td class="caption grey--text text-truncate" style="max-width: 150px;">
+                                {{ response.description }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </template>
+            </v-simple-table>
+            <v-divider  style="margin-top:0.5em"></v-divider>
+            <h3 style="margin-top:1em">
+                Cluster summary
+                <v-tooltip top>
+                    <template v-slot:activator="{ on }">
+                        <span v-on="on">
+                            <v-icon v-on="on">{{ $MDI.HelpCircleOutline }}</v-icon>
                         </span>
-                    </v-tooltip>
-                </h3>
+                    </template>
+                    <span>
+                        TODO
+                    </span>
+                </v-tooltip>
+            </h3>
                 <dl class="dl-4">
                 <div>
                 <dt>
@@ -184,8 +159,7 @@ export default {
             response: null,
             fetching: false,
             second: "",
-            showLineage1: false,
-            showLineage2: false,
+            showLineage: false,
         }
     },
     mounted() {

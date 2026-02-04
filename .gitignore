@@ -12,6 +12,7 @@ backend/.cache/
 .vscode/
 
 data/interfacedb/*
+data/dimerdb/*
 data/obsolete/*
 data/taxdump.tar.gz
 data/*.dmp
