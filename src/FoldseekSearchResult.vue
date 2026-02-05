@@ -1,14 +1,14 @@
 <template>
     <v-flex xs12>
     <panel class="query-panel d-flex fill-height" fill-height>
-        <template slot="header">
+        <template v-slot:header>
             Cluster selection
             <template v-if="$route.params.jobid">
                 for <a :href="'https://search.foldseek.com/result/' + $route.params.jobid + '/0'" target="_blank" rel="noopener">{{ $route.params.jobid }}</a>
             </template>
         </template>
     
-        <template slot="content">
+        <template v-slot:content>
             <v-data-table
                 :headers="headers"
                 :items="response"
@@ -28,7 +28,7 @@
     
                 <template v-slot:item.rep_accession="prop">
                     <ExternalLinks :accession="prop.value">
-                        <router-link slot="accession" :to="{ name: 'cluster', params: { cluster: prop.value }}" target='_blank'>{{ prop.value }}</router-link>
+                        <router-link v-slot:accession :to="{ name: 'cluster', params: { cluster: prop.value }}" target='_blank'>{{ prop.value }}</router-link>
                     </ExternalLinks><br>
                     {{ prop.item.description }}
                 </template>

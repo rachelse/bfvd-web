@@ -1,10 +1,10 @@
 <template>
 <Panel style="margin-top: 1em;" collapsible>
-    <template slot="header">
+    <template v-slot:header>
         Similar clusters
     </template>
 
-    <template slot="toolbar-extra">
+    <template v-slot:toolbar-extra>
         <v-menu offset-y>
             <template v-slot:activator="{ on }">
                 <v-btn plain v-on="on">
@@ -27,7 +27,7 @@
         </v-menu>
     </template>
 
-<template slot="content" v-if="$route.params.cluster">
+<template v-slot:content v-if="$route.params.cluster">
     <v-data-table
         :headers="headers"
         :items="entries"

@@ -3,15 +3,15 @@
 <v-row style="margin:1em;">
     <v-flex xs12 md8>
     <panel>
-        <template slot="header" v-if="response">
+        <template v-slot:header v-if="response">
             Cluster: {{ response ? response.intclu_rep_accession : "Loading..." }}
         </template>
 
-        <template v-if="response && response.warning == true" slot="toolbar-extra">
+        <template v-if="response && response.warning == true" v-slot:toolbar-extra>
             <v-chip color="error">Warning</v-chip>
         </template>
 
-        <template slot="content" v-if="response">
+        <template v-slot:content v-if="response">
             <div class="d-flex align-center justify-space-between mb-2">
                 <h3>Representative PDB: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
             </div>
@@ -114,10 +114,10 @@
     </v-flex>
     <v-flex xs12 md4>
     <Panel class="repr-structure">
-        <template slot="header">
+        <template v-slot:header>
             Representative structure
         </template>
-        <template slot="content" v-if="response">
+        <template v-slot:content v-if="response">
             <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" :chain1_id="response.chain1_id" :chain2_id="response.chain2_id" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
         </template>
     </Panel>
