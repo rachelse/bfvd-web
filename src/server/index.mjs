@@ -29,7 +29,7 @@ console.timeLog();
 
 console.log('Loading SQL...')
 const sql = await open({
-    filename: dataPath + '/toydb.sqlite3',// '/afdb-clusters.sqlite3',
+    filename: dataPath + '/afdb.sqlite3',// '/afdb-clusters.sqlite3',
     driver: sqlite3.Database,
     mode: sqlite3.OPEN_READONLY,
 })
@@ -349,7 +349,6 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
 });
 
 app.get('/api/:query', async (req, res) => {
-    // let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.accession = ?", req.params.query);
     let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.uniprot_id1 = ? OR m.uniprot_id2 = ?", req.params.query, req.params.query);
     if (!result || result.lca_tax_id == null) {
         res.status(404).send({ error: "No cluster found" });
@@ -512,8 +511,7 @@ app.get('/api/cluster/:cluster', async (req, res) => {
         return;
     }
     result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
-    // FIXME: RACHEL tree.nodeExists(result.lca_tax_id.id) says false
-    // result.lineage = tree.nodeExists(result.lca_tax_id.id) ? tree.lineage(result.lca_tax_id) : null;
+    result.lineage = tree.nodeExists(result.lca_tax_id.id) ? tree.lineage(result.lca_tax_id) : null;
     result.tax_id1 = tree.nodeExists(result.tax_id1) ? tree.getNode(result.tax_id1) : null;
     result.tax_id2 = tree.nodeExists(result.tax_id2) ? tree.getNode(result.tax_id2) : null;
     result.rep_lineage1 = tree.nodeExists(result.tax_id1.id) ? tree.lineage(result.tax_id1) : null;

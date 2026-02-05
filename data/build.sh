@@ -23,13 +23,10 @@ CREATE TABLE member (
 
 CREATE TABLE cluster (
 	intclu_rep_accession INTEGER PRIMARY KEY,
-	rep_len INTEGER,
-	rep_plddt REAL,
-	is_dark BOOLEAN,
 	n_mem INTEGER,
-	avg_len INTEGER,
-	avg_plddt REAL,
-	lca_tax_id INTEGER
+	lca_tax_id INTEGER,
+	lca_tax_chain1_id INTEGER,
+	lca_tax_chain2_id INTEGER
 );
 
 PRAGMA journal_mode=OFF;
@@ -60,13 +57,10 @@ CREATE TABLE tmpMember (
 
 CREATE TABLE tmpCluster (
 	rep_id INTEGER,
-	is_dark BOOLEAN,
 	n_mem INTEGER,
-	rep_len INTEGER,
-	avg_len REAL,
-	rep_plddt REAL,
-	avg_plddt REAL,
-	lca_tax_id INTEGER
+	lca_tax_id INTEGER,
+	lca_tax_chain1_id INTEGER,
+	lca_tax_chain2_id INTEGER
 );
 
 .import "${2}" tmpMember
@@ -98,8 +92,8 @@ CREATE INDEX member_uniprot2_idx
 ON member(uniprot_id2);
 
 -- Insert clusters
-INSERT INTO cluster (intclu_rep_accession, is_dark, n_mem, rep_len, avg_len, rep_plddt, avg_plddt, lca_tax_id)
-SELECT rep_id, is_dark, n_mem, rep_len, avg_len, rep_plddt, avg_plddt, lca_tax_id
+INSERT INTO cluster (intclu_rep_accession, n_mem, lca_tax_id, lca_tax_chain1_id, lca_tax_chain2_id)
+SELECT rep_id, n_mem, lca_tax_id, lca_tax_chain1_id, lca_tax_chain2_id
 FROM tmpCluster;
 
 -- Index on cluster representative accessions

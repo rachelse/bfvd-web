@@ -22,7 +22,7 @@
                         <tr>
                             <th class="text-left">Chain</th>
                             <th class="text-left">UniProt</th>
-                            <th class="text-left">Taxonomy <v-button plain text small icon @click="showLineage = !showLineage"><v-icon small>{{ showLineage ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon></v-button></th>
+                            <th class="text-left">Taxonomy <v-btn plain text small icon @click="showLineage = !showLineage"><v-icon small>{{ showLineage ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon></v-btn></th>
                             <th class="text-left">Description</th>
                         </tr>
                     </thead>
@@ -83,14 +83,14 @@
                     {{ response.n_mem }}
                 </dd>
                 </div>
-                <div>
+                <!-- <div>
                 <dt>
                     Average length
                 </dt>
                 <dd>
                     {{ response.avg_len.toFixed(2) }} aa
                 </dd>
-                </div>
+                </div> -->
                 <div style=" grid-area: 2 / 1 / 3 / 5;">
                 <dt>
                     Lowest common ancestor and lineage
