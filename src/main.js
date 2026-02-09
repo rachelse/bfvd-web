@@ -3,7 +3,7 @@ import VueRouter from 'vue-router';
 import Vuetify from 'vuetify/lib';
 import { create } from 'axios';
 import Portal from './lib/vue-simple-portal';
-import { NglService } from './NglService.mjs';
+import { MolstarService } from './MolstarService.mjs';
 
 import {
     mdiHistory,
@@ -126,7 +126,7 @@ Vue.use({
         };
 
         Vue.prototype.$axios = create(axiosConfig);
-        Vue.prototype.$nglService = new NglService();
+        Vue.prototype.$molstarService = new MolstarService();
     }
 });
 

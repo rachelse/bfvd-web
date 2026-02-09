@@ -99,33 +99,25 @@
 </template>
 
 <script>
-import { Shape, Stage, Selection, download, ColormakerRegistry, PdbWriter } from 'ngl';
+import { createPluginUI } from 'molstar/lib/mol-plugin-ui/index.js';
+import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18.js';
+import { DefaultPluginUISpec } from 'molstar/lib/mol-plugin-ui/spec.js';
+import { StateTransforms } from 'molstar/lib/mol-state/transform.js';
+import { Mat4 } from 'molstar/lib/mol-math/linear-algebra.js';
+import { Color } from 'molstar/lib/mol-util/color/index.js';
+
 import Panel from './Panel.vue';
 import { pulchra } from 'pulchra-wasm';
 
-
+// TM-align worker setup stays same
 const worker = new Worker(new URL('./tmalign-worker.js', import.meta.url));
 const tmalign = function(pdb1, pdb2) {
     return new Promise((resolve, reject) => {
-        worker.onmessage = function(e) {
-            resolve(e.data);
-        };
-        worker.onerror = function(e) {
-            reject(e);
-        };
+        worker.onmessage = (e) => resolve(e.data);
+        worker.onerror = (e) => reject(e);
         worker.postMessage({ pdb1, pdb2 });
     });
 };
-
-// Create NGL arrows from array of ([X, Y, Z], [X, Y, Z]) pairs
-// function createArrows(matches) {
-//     const shape = new Shape('shape')
-//     for (let i = 0; i < matches.length; i++) {
-//         const [a, b] = matches[i]
-//         shape.addArrow(a, b, [0, 1, 1], 0.4)
-//     }
-//     return shape
-// }
 
 const oneToThree = {
   "A":"ALA", "R":"ARG", "N":"ASN", "D":"ASP",
@@ -136,104 +128,54 @@ const oneToThree = {
   "U":"SEC", "O":"PHL", "X":"XAA"
 };
 
-/**
- * Create a mock PDB from Ca data
- * Follows the spacing spec from https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
- * Will have to change if/when swapping to fuller data
- */
-function mockPDB(ca, seq, chain) {
+// function mockPDB(ca, seq, chain = 'A') {
+//     const chainLength = ca.length / 3;
+//     const pdb = [];
+//     let j = 0;
+//     for (let i = 0; i < ca.length; i+=3, j++) {
+//         const line = 'ATOM  '
+//             + (j+1).toString().padStart(5)
+//             + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == seq.length ? seq[i/3] : 'A'] + ' ' + chain
+//             + (j+1).toString().padStart(4)
+//             + '    '
+//             + ca[0 * chainLength + j].toFixed(3).padStart(8)
+//             + ca[1 * chainLength + j].toFixed(3).padStart(8)
+//             + ca[2 * chainLength + j].toFixed(3).padStart(8)
+//             + '  1.00  0.00           C  ';
+//         pdb.push(line);
+//     }
+//     return pdb.join('\n');
+// }
+function mockPDB(ca, seq, chain = 'A') {
     const chainLength = ca.length / 3;
-    const pdb = new Array()
+    const pdb = [];
     let j = 0;
-    for (let i = 0; i < ca.length; i+=3, j++) {
+    for (let i = 0; i < ca.length; i += 3, j++) {
+        // Force conversion to Number to prevent .toFixed error
+        const x = Number(ca[0 * chainLength + j]);
+        const y = Number(ca[1 * chainLength + j]);
+        const z = Number(ca[2 * chainLength + j]);
+
         const line = 'ATOM  '
-            + j.toString().padStart(5)
-            + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == (seq.length - 1) ? seq[i/3] : 'A'] + ' ' + chain
-            + j.toString().padStart(4)
+            + (j + 1).toString().padStart(5)
+            + '  CA  ' + (oneToThree[seq != "" && (ca.length / 3) == seq.length ? seq[i / 3] : 'A'] || 'ALA') + ' ' + chain
+            + (j + 1).toString().padStart(4)
             + '    '
-            + ca[0 * chainLength + j].toString().padStart(8)
-            + ca[1 * chainLength + j].toString().padStart(8)
-            + ca[2 * chainLength + j].toString().padStart(8)
+            + x.toFixed(3).padStart(8) // Now safe to call .toFixed
+            + y.toFixed(3).padStart(8)
+            + z.toFixed(3).padStart(8)
             + '  1.00  0.00           C  ';
         pdb.push(line);
-        
     }
-    return pdb.join('\n')
+    return pdb.join('\n');
 }
-
-/* ------ The rotation matrix to rotate Chain_1 to Chain_2 ------ */
-/* m               t[m]        u[m][0]        u[m][1]        u[m][2] */
-/* 0     161.2708425765   0.0663961888  -0.6777150909  -0.7323208325 */
-/* 1     109.4205584665  -0.9559071424  -0.2536229340   0.1480437178 */
-/* 2      29.1924015422  -0.2860648199   0.6902011757  -0.6646722921 */
-/* Code for rotating Structure A from (x,y,z) to (X,Y,Z): */
-/* for(i=0; i<L; i++) */
-/* { */
-/*    X[i] = t[0] + u[0][0]*x[i] + u[0][1]*y[i] + u[0][2]*z[i]; */
-/*    Y[i] = t[1] + u[1][0]*x[i] + u[1][1]*y[i] + u[1][2]*z[i]; */
-/*    Z[i] = t[2] + u[2][0]*x[i] + u[2][1]*y[i] + u[2][2]*z[i]; */
-/* } */
-const transformStructure = (structure, t, u) => {
-    structure.eachAtom(atom => {
-        const [x, y, z] = [atom.x, atom.y, atom.z]
-        atom.x = t[0] + u[0][0] * x + u[0][1] * y + u[0][2] * z
-        atom.y = t[1] + u[1][0] * x + u[1][1] * y + u[1][2] * z
-        atom.z = t[2] + u[2][0] * x + u[2][1] * y + u[2][2] * z
-    })
-    return structure
-}
-
-// Get XYZ coordinates of CA of a given residue
-const xyz = (structure, resIndex) => {
-    var rp = structure.getResidueProxy()
-    var ap = structure.getAtomProxy()
-    rp.index = resIndex
-    ap.index = rp.getAtomIndexByName('CA')
-    return [ap.x, ap.y, ap.z]
-}
-
-// Given an NGL AtomProxy, return the corresponding PDB line
-const atomToPDBRow = (ap) => {
-    const { serial, atomname, resname, chainname, resno, inscode, x, y, z } = ap
-    return `ATOM  ${serial.toString().padStart(5)}${atomname.padStart(4)}  ${resname.padStart(3)} ${chainname.padStart(1)}${resno.toString().padStart(4)} ${inscode.padStart(1)}  ${x.toFixed(3).padStart(8)}${y.toFixed(3).padStart(8)}${z.toFixed(3).padStart(8)}`
-}
-
-// Map 1-based indices in a selection to residue index/resno
-const makeChainMap = (structure, sele) => {
-    let idx = 1
-    let map = new Map()
-    structure.eachResidue(rp => { map.set(idx++, { index: rp.index, resno: rp.resno }) }, new Selection(sele))
-    return map
-}
-
-// Generate a subsetted PDB file from a structure and selection
-const makeSubPDB = (structure, sele) => {
-    let pdb = []
-    structure.eachAtom(ap => { pdb.push(atomToPDBRow(ap)) }, new Selection(sele))
-    return pdb.join('\n')
-}
-
-var discreteBfactor = ColormakerRegistry.addScheme(function (params) {
-  this.atomColor = function (atom) {
-    if (atom.bfactor > 0.9) {
-      return 0x0000F5;  // blue
-    } else if (atom.bfactor > 0.7) {
-      return 0x00FFFF;  // cyan
-    } else if (atom.bfactor > 0.5) {
-      return 0xFFFF00;  // yellow
-    } else {
-      return 0xFFA500;  // orange
-    }
-  };
-});
-
 
 export default {
     components: { Panel },
     data: () => ({
-        stage: null,
-        component: null,
-        secondComponent: null,
+        plugin: null, // Molstar Context
+        component: null, // Primary Structure
+        secondComponent: null, // Superposed Structure
         tmOutput: null,
         'isFullscreen': false,
         'hovered': false,
@@ -244,126 +186,91 @@ export default {
         'chain1_id': { type: Number, required: true },
         'chain2_id': { type: Number, required: true },
         'toolbar': { type: Boolean, default: true },
-        'bgColorLight': { type: String, default: "white" },
-        'bgColorDark': { type: String, default: "#eee" },
+        'bgColorLight': { type: String, default: "0xffffff" },
+        'bgColorDark': { type: String, default: "0xeeeeee" },
     },
     methods: {
-        handleResize() {
-            if (!this.stage) return
-            this.stage.handleResize()
-        },
-        toggleFullscreen() {
-            if (!this.stage) return
-            this.stage.toggleFullscreen(this.$refs.structurepanel)
-        },
-        resetView() {
-            if (!this.stage) return
-            if (this.secondComponent) {
-                this.secondComponent.removeAllRepresentations();
-                this.stage.removeComponent(this.secondComponent);
-                this.secondComponent = null;
-                this.component.removeAllRepresentations();
-                this.component.addRepresentation("cartoon", { color: discreteBfactor });
-                this.$emit('reset', null);
-            }
-            this.stage.autoView()
-        },
-        makeImage() {
-            if (!this.stage) return
-            this.stage.viewer.setLight(undefined, undefined, undefined, 0.2)
-            this.stage.makeImage({
-                trim: true,
-                factor: (this.isFullscreen) ? 1 : 8,
-                antialias: true,
-                transparent: true,
-            }).then((blob) => {
-                this.stage.viewer.setLight(undefined, undefined, undefined, this.$vuetify.theme.dark ? 0.4 : 0.2)
-                download(blob, this.cluster + ".png")
-            })
-        },
-        makePdb() {
-            if (!this.stage) return;
-            if (!this.component) return;
-            const header = 
-`REMARK     This file was generated by the Foldseek clusters webserver:
-REMARK       https://cluster.foldseek.com
-REMARK     Please cite:
-REMARK       https://doi.org/10.1101/2023.03.09.531927 
-REMARK     Warning: Please refer to the original AFDB PDB files.
-REMARK       This file was auto-generated from compressed information:
-REMARK         * Non C-alpha atoms were re-generated by PULCHRA.
-REMARK         * pLDDTs were discretized into 0 to 9 bins.
-REMARK         * Residue/atom indices were sequentially renumbered`;
-            if (!this.secondComponent) {
-                let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
-                pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                let result =
-`TITLE     ${this.cluster}
-${header}
-${pdb}
-END
-`;
-                download(new Blob([result], { type: 'text/plain' }), this.cluster + ".pdb");
-            } else {
-                let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
-                pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                let pdb2 = new PdbWriter(this.secondComponent.structure, { renumberSerial: false }).getData();
-                pdb2 = pdb2.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                let result =
-`TITLE     ${this.cluster}+${this.second}
-${header}
-MODEL        1
-${pdb}
-ENDMDL
-MODEL        2
-${pdb2}
-ENDMDL
-END
-`;
-                download(new Blob([result], { type: 'text/plain' }), this.cluster + '+' + this.second + ".pdb");
-            }
-        },
-        fetchStructure(accession) {
-            return this.$axios.get("/structure/" + accession)
-                .then((response) => {
-                    // const plddt = response.data.plddt;
-                    return pulchra(mockPDB(response.data.coordinates, response.data.seq))
-                        .then((pdb) => {
-                            return this.stage.loadFile(new Blob([pdb], { type: 'text/plain' }), {ext: 'pdb', firstModelOnly: true})
-                        })
-                        .then((component) => {
-                            component.structure.eachAtom((ap) => {
-                                ap.bfactor = ((+(plddt[ap.resno]))+0.5)/10;
-                            });
-                            return component;
-                        })
-                })
-        },
-        fetchDimerStructure(accession1, accession2) {
-            return Promise.all([
-                this.$axios.get("/structure/" + accession1),
-                this.$axios.get("/structure/" + accession2)
-            ]).then(([r1, r2]) => {
-                return Promise.all([
-                    pulchra(mockPDB(r1.data.coordinates, r1.data.seq, 'A')),
-                    pulchra(mockPDB(r2.data.coordinates, r2.data.seq, 'B'))
-                ]);
-            }).then(async ([pdb1, pdb2]) => {
-                const fixChain = (pdb, chainId) => {
-                    return pdb.split('\n').map(line => {
-                        if (line.startsWith('ATOM')) {
-                            return line.slice(0, 21) + chainId + line.slice(22);
-                        } else {
-                            return line;
-                        }
-                    }).join('\n');
-                };
-                pdb1 = fixChain(pdb1, 'A');
-                pdb2 = fixChain(pdb2, 'B');
-                const filter = (p) => p.split('\n').filter(l => l.startsWith('ATOM') || l.startsWith('HETATM')).join('\n');
-                const combined = filter(pdb1) + '\n' + filter(pdb2); // Hack to concatenate two chains into one PDB
-                return this.stage.loadFile(new Blob([combined], { type: 'text/plain' }), {ext: 'pdb', firstModelOnly: false});
+        async initMolstar() {
+            const bgColor = this.$vuetify.theme.dark ? this.bgColorDark : this.bgColorLight;
+            const colorNum = Color(bgColor);
+            const spec = {
+                ...DefaultPluginUISpec(),
+                layout: {
+                    initial: {
+                        showControls: false,
+                        regionState: { right: 'hidden', top: 'hidden', left: 'hidden', bottom: 'hidden' }
+                    }
+                },
+                canvas3d: {
+                    renderer: { backgroundColor: colorNum },
+                }
+            };
+
+            this.plugin = await createPluginUI({
+                target: this.$refs.viewport,
+                spec,
+                render: renderReact18
             });
+        },
+
+        async loadPdbData(pdbString, colorHex = null) {
+            const data = await this.plugin.builders.data.rawData({ data: pdbString });
+            const trajectory = await this.plugin.builders.structure.parseTrajectory(data, 'pdb');
+            // const model = await this.plugin.builders.structure.;
+            // console.log(model)
+            // const model = await this.plugin.builders.structure.addModel(trajectory);
+            // const structure = await this.plugin.builders.structure.addStructure(model);
+
+            // const colorProp = colorHex ? { name: 'uniform', params: { value: Color(parseInt(colorHex.replace('#', ''), 16)) } } : { name: 'chain-id' };
+
+            // const representation = await this.plugin.builders.structure.representation.addRepresentation(structure, {
+            //     type: 'cartoon',
+            //     color: colorProp.name,
+            //     colorParams: colorProp.params
+            // });
+
+            // return { structure, representation };
+            return await this.plugin.builders.structure.hierarchy.applyPreset(trajectory, "default");
+        },
+
+        resetView() {
+            this.plugin?.managers.camera.reset();
+            // TODO: also reset selections
+        },
+
+        async makeImage() { //FIXME: not working
+            const data = await this.plugin.helpers.viewportScreenshot.getByteData({ transparent: true, multiply: 2 });
+            const blob = new Blob([data], { type: 'image/png' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.cluster}.png`;
+            a.click();
+        },
+
+        toggleFullscreen() { // FIXME: not working
+            this.plugin.managers.interactivity.setProps({ isFullscreen: !this.isFullscreen });
+            this.isFullscreen = !this.isFullscreen;
+        },
+
+        async fetchStructure(accession) {
+            const response = await this.$axios.get("/structure/" + accession);
+            const pdb = await pulchra(mockPDB(response.data.coordinates, response.data.seq, 'A'));
+            return await this.loadPdbData(pdb);
+        },
+
+        async fetchDimerStructure(id1, id2) {
+            const [r1, r2] = await Promise.all([
+                this.$axios.get("/structure/" + id1),
+                this.$axios.get("/structure/" + id2)
+            ]);
+            const pdb1 = await pulchra(mockPDB(r1.data.coordinates, r1.data.seq, 'A'));
+            const pdb2 = await pulchra(mockPDB(r2.data.coordinates, r2.data.seq, 'B'));
+            
+            // In Molstar, we load them as one "Combined" PDB or two separate components.
+            // For simplicity, we load the concatenated ATOM records.
+            const combined = pdb1.split('END')[0] + '\n' + pdb2.split('END')[0];
+            return await this.loadPdbData(combined);
         }
     },
     computed: {
@@ -382,94 +289,42 @@ END
     },
     watch: {
         'cluster': {
-            handler() {
-                this.$nextTick(() => {
-                    if (!this.cluster) {
-                        return;
-                    }
-                    this.stage.removeAllComponents();
-                    
-                    this.fetchDimerStructure(this.chain1_id, this.chain2_id)
-                        .then((component) => {
-                            this.component = component;
-                            this.component.addRepresentation("cartoon", { color: "chainname" });
-                            this.stage.autoView();
-                            return component;
-                        })
-                });
+            async handler(val) {
+                if (!val || !this.plugin) return;
+                await this.plugin.clear();
+                this.component = await this.fetchDimerStructure(this.chain1_id, this.chain2_id);
+                this.resetView();
             },
-            immediate: true,
+            immediate: false
         },
         'second': {
-            handler() {
-                if (this.second == "") {
-                    return;
-                }
-                this.$nextTick(() => {
-                    this.stage.removeComponent(this.secondComponent);
-                    this.secondComponent = null;
-                    let tmpComponent = null
-                    this.fetchStructure(this.second)
-                        .then((component) => {
-                            tmpComponent = component;
-                            return component;
-                        })
-                        .then((c) => {
-                            let qSubPdb = makeSubPDB(this.component.structure,'')
-                            let tSubPdb = makeSubPDB(c.structure, '')
-                            return tmalign(tSubPdb, qSubPdb)
-                        })
-                        .then((tm) => {
-                            this.secondComponent = tmpComponent;
-                            this.tmOutput = tm.output;
-                            transformStructure(this.secondComponent.structure, tm.matrix.t, tm.matrix.u)
-                            this.component.removeAllRepresentations();
-                            this.component.addRepresentation("cartoon", { color: "#1E88E5" });
-                            this.secondComponent.addRepresentation("cartoon", { color: "#FFC107" });
-                            this.stage.autoView()
-                        })
-                });
-            },
-            immediate: true,
-        },
-    },
-    mounted() {
-        const bgColor = this.$vuetify.theme.dark ? this.bgColorDark : this.bgColorLight;
-        const ambientIntensity = this.$vuetify.theme.dark ? 0.4 : 0.2;
-        this.stage = new Stage(this.$refs.viewport,{
-            backgroundColor: bgColor,
-            ambientIntensity: ambientIntensity,
-            clipNear: -1000,
-            clipFar: 1000,
-            fogFar: 1000,
-            fogNear: -1000,
-            quality: 'high',
-            tooltip: this.toolbar,
-        });
+            async handler(val) {
+                if (!val || val === "" || !this.plugin) return;
+                
+                const secondData = await this.fetchStructure(val);
+                this.secondComponent = secondData;
 
-        window.addEventListener('resize', this.handleResize)
-        this.stage.signals.fullscreenChanged.add((isFullscreen) => {
-            if (isFullscreen) {
-                this.stage.viewer.setBackground('#ffffff')
-                this.stage.viewer.setLight(undefined, undefined, undefined, 0.2)
-                this.isFullscreen = true
-            } else {
-                this.stage.viewer.setBackground(bgColor)
-                this.stage.viewer.setLight(undefined, undefined, undefined, ambientIntensity)
-                this.isFullscreen = false
+                // Here you would integrate your transformStructure logic
+                // Molstar uses Mat4.fromArray for rotation/translation matrices
+                // this.plugin.builders.structure.transform(this.secondComponent.structure, matrix);
+                
+                this.resetView();
             }
-        })
+        }
+    },
+    async mounted() {
+        await this.initMolstar();
+        if (this.cluster) this.fetchDimerStructure(this.chain1_id, this.chain2_id);
     },
     beforeDestroy() {
-        if (typeof(this.stage) == 'undefined')
-            return
-        this.stage.dispose() 
-        window.removeEventListener('resize', this.handleResize)
+        this.plugin?.dispose();
     }
 }
 </script>
 
 <style scoped>
+@import '~molstar/lib/mol-plugin-ui/skin/light.scss';
+
 .structure-wrapper {
     margin: 0 auto;
     position: relative;
