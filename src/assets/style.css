@@ -72,3 +72,15 @@ main.content {
 .v-application {
     background: transparent/*#000000 !important;*/
 }
+
+.custom-link-nohighlight {
+    color: #000000 !important;
+    text-decoration: none;
+}
+.theme--dark .custom-link-nohighlight {
+    color: #FFFFFF !important;  /* #1E88E5; */
+}
+.custom-link-nohighlight:hover {
+    color: #1E88E5 !important;
+    text-decoration: underline;
+}

@@ -15,6 +15,7 @@
             <v-list>
                 <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/members?format=accessions&${requestOptions.params.toString()}`" target="_blank">
                     <v-list-item-content>
+                        <!-- <v-list-item-title>Accessions</v-list-item-title> -->
                         <v-list-item-title>Accessions</v-list-item-title>
                     </v-list-item-content>
                 </v-list-item>
@@ -40,8 +41,14 @@
         }"
     >
         <template v-slot:item.accession="prop">
-            <ExternalLinks :accession="prop.value"></ExternalLinks><br>
-            {{ prop.item.description }}
+            <ExternalLinks :accession="prop.item.pdb_id.toUpperCase()" reference="PDB" simple></ExternalLinks><br>
+            {{ prop.item.description }} TODO
+        </template>
+        <template v-slot:item.chains="prop">
+            {{ prop.item.chain1 }}:{{ prop.item.chain2 }}
+        </template>
+        <template v-slot:item.uniprot="prop">
+            <ExternalLinks :accession="prop.item.uniprot_id1" simple />:&nbsp;<ExternalLinks :accession="prop.item.uniprot_id2" simple />
         </template>
         <template v-slot:header.structure="{ header }">
             {{ header.text }}
@@ -79,10 +86,14 @@
                             </template>
                             <span>
                                 <img width="600" src="./assets/cluster_step.jpg"><br>
-                                AFDB/Foldseek: Clustered with structural similarity<br>
-                                AFDB50/Mmseqs: Clustered at sequence identity 50%<br>
-                                Fragment: Removed fragments among AFDB50<br>
-                                Singleton: Removed singletons after fragment removal
+                                <!-- TODO -->
+                                Interface Representative: <br>
+                                Dimer Representative: <br>
+                                Member: <br>
+                                <!-- AFDB/Foldseek: Clustered with structural similarity<br> -->
+                                <!-- AFDB50/Mmseqs: Clustered at sequence identity 50%<br> -->
+                                <!-- Fragment: Removed fragments among AFDB50<br> -->
+                                <!-- Singleton: Removed singletons after fragment removal -->
                             </span>
                         </v-tooltip>
                     </v-btn>
@@ -109,7 +120,7 @@
                 </TaxonomyAutocomplete>
         </template>
         <template v-slot:item.tax_id="prop">
-            <TaxSpan :taxonomy="prop.value"></TaxSpan>
+            <TaxSpan :taxonomy="prop.item.tax_id1"></TaxSpan>:<TaxSpan :taxonomy="prop.item.tax_id2"></TaxSpan>
         </template>
 
         <template v-slot:item.actions="{ item }">
@@ -155,10 +166,22 @@ export default {
                     width: "10%",
                 },
                 {
-                    text: "Accession",
+                    text: "PDB ID",
                     value: "accession",
                     sortable: false,
-                    width: "35%",
+                    width: "15%",
+                },
+                {
+                    text: "Dimer",
+                    value: "chains",
+                    sortable: false,
+                    width: "15%",
+                },
+                {
+                    text: "UniProt ID",
+                    value: "uniprot",
+                    sortable: false,
+                    width: "20%",
                 },
                 // {
                 //     text: "Length",
@@ -243,7 +266,7 @@ export default {
                 .then(response => {
                     this.members = response.data.result;
                     this.totalMembers = response.data.total;
-                    this.fetchImages(this.members.map(m => m.accession));
+                    this.fetchImages(this.members.map(m => m.accession)); // TODO change
                 })
                 .catch(() => {})
                 .finally(() => {

@@ -157,7 +157,7 @@ function finalizeResult(result, req, res) {
     return;
 }
 
-app.get('/api/search/go/:taxonomy?', async (req, res) => {
+app.get('/api/search/go/{:taxonomy}', async (req, res) => {
     const go_search_type = req.query.go_search_type;
     const goid = req.query.query_GO;
 
@@ -222,7 +222,7 @@ app.get('/api/autocomplete/go/:substring', async (req, res) => {
     res.send({ result });
 });
 
-app.get('/api/search/lca/:taxonomy?', async (req, res) => {
+app.get('/api/search/lca/{:taxonomy}', async (req, res) => {
     const taxid = req.query.taxid;
     const lca_search_type = req.query.type;
 
@@ -264,7 +264,7 @@ app.get('/api/search/lca/:taxonomy?', async (req, res) => {
     return finalizeResult(result, req, res);
 });
 
-app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
+app.get('/api/search/foldseek/{:taxonomy}', async (req, res) => {
     const jobid = encodeURIComponent(req.query.jobid);
 
     let results = [];
@@ -417,9 +417,14 @@ function makeSankey(result) {
         if (tree.nodeExists(x.tax_id1) == false) {
             return;
         }
-        let node = tree.getNode(x.tax_id1, true);
-        while (node.id != 1) {
-            let currentNode = node;
+        let node1 = tree.getNode(x.tax_id1, true);
+        if (tree.nodeExists(x.tax_id2) == false) {
+            return;
+        }
+        let node2 = tree.getNode(x.tax_id2, true);
+
+        while (node1.id != 1) {
+            let currentNode = node1;
             // skip all ranks except superkingdom, phylum, class, order, family, genus
             while (!allowedRanks.includes(currentNode.rank)) {
                 currentNode = tree.getNode(currentNode.parent, true);
@@ -452,11 +457,58 @@ function makeSankey(result) {
                 };
             }
 
-            node = parentNode;
+            node1 = parentNode;
             if (currentNode.id == 1 || parentNode.id == 1) {
                 break;
             }
 
+            const linkKey = `${currentNode.id}-${parentNode.id}`;
+            if (!(linkKey in links)) {
+                links[linkKey] = {
+                    source: parentNode.id,
+                    target: currentNode.id,
+                    value: 1,
+                    rank: idx_to_rank[parentNode.rank],
+                    name: parentNode.name,
+                }
+            } else {
+                links[linkKey].value += 1;
+            }
+        }
+
+        while (node2.id != 1) {
+            let currentNode = node2;
+            while (!allowedRanks.includes(currentNode.rank)) {
+                currentNode = tree.getNode(currentNode.parent, true);
+                if (currentNode.id == 1) {
+                    break;
+                }
+            }
+            let parentNode = tree.getNode(currentNode.parent, true);
+            while (!allowedRanks.includes(parentNode.rank)) {
+                parentNode = tree.getNode(parentNode.parent, true);
+                if (parentNode.id == 1) {
+                    break;
+                }
+            }
+            if (!(currentNode.id in nodes)) {
+                nodes[currentNode.id] = {
+                    id: currentNode.id,
+                    name: currentNode.name,
+                    rank: idx_to_rank[currentNode.rank],
+                };
+            }
+            if (!(parentNode.id in nodes)) {
+                nodes[parentNode.id] = {
+                    id: parentNode.id,
+                    name: parentNode.name,
+                    rank: idx_to_rank[parentNode.rank],
+                };
+            }
+            node2 = parentNode;
+            if (currentNode.id == 1 || parentNode.id == 1) {
+                break;
+            }
             const linkKey = `${currentNode.id}-${parentNode.id}`;
             if (!(linkKey in links)) {
                 links[linkKey] = {
@@ -478,11 +530,11 @@ function makeSankey(result) {
 app.get('/api/cluster/:cluster/sankey-members', async (req, res) => {
     const cluster = req.params.cluster;
     let result = await sql.all(`
-    SELECT tax_id1
+    SELECT tax_id1, tax_id2
         FROM member
         WHERE intclu_rep_accession == ?;
     `, cluster);
-    // res.send({result: makeSankey(result)}); // RACHEL: TODO
+    res.send({result: makeSankey(result)});
 });
 
 // app.get('/api/cluster/:cluster/sankey-similars', async (req, res) => {
@@ -538,7 +590,6 @@ function processAndWriteInChunks(data, chunkSize, processingFunc, writeFunc) {
 }
 
 app.get('/api/cluster/:cluster/members', async (req, res) => {
-    // RACHEL: DOING Implement for tax_id2 as well
     let flagFilter = '';
     let args = [ req.params.cluster ];
     if (req.query.flagFilter != null) {
@@ -550,9 +601,9 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
 
     let result;
     let total = 0;
-    if (req.query.tax_id1) {
+    if (req.query.tax_id) {
         result = await sql.all(`
-        SELECT accession, tax_id1, flag
+        SELECT accession, pdb_id, chain1, chain2, uniprot_id1, uniprot_id2, tax_id1, tax_id2, flag
             FROM member
             WHERE intclu_rep_accession = ? ${flagFilter}
             ORDER BY rowid;
@@ -562,10 +613,22 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             if (tree.nodeExists(x.tax_id1) == false) {
                 return false;
             }
+            if (tree.nodeExists(x.tax_id2) == false) {
+                return false;
+            }
+
             x.tax_id1 = tree.getNode(x.tax_id1);
+            x.tax_id2 = tree.getNode(x.tax_id2);
             let currNode = x.tax_id1;
             while (currNode.id != 1) {
-                if (currNode.id == req.query.tax_id1) {
+                if (currNode.id == req.query.tax_id) {
+                    return true;
+                }
+                currNode = tree.getNode(currNode.parent);
+            }
+            currNode = x.tax_id2;
+            while (currNode.id != 1) {
+                if (currNode.id == req.query.tax_id) {
                     return true;
                 }
                 currNode = tree.getNode(currNode.parent);
@@ -590,7 +653,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             paginate_query = "LIMIT ? OFFSET ?";
         }
         result = await sql.all(`
-        SELECT accession, tax_id1, flag
+        SELECT accession, pdb_id, chain1, chain2, uniprot_id1, uniprot_id2, tax_id1, tax_id2, flag
             FROM member
             WHERE intclu_rep_accession = ? ${flagFilter}
             ORDER BY rowid
@@ -598,6 +661,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
         `, ...args);
         result.forEach((x) => {
             x.tax_id1 = tree.nodeExists(x.tax_id1) ? tree.getNode(x.tax_id1) : null;
+            x.tax_id2 = tree.nodeExists(x.tax_id2) ? tree.getNode(x.tax_id2) : null;
             x.description = getDescription(x.accession);
         });
     }
@@ -625,7 +689,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             res.charset = 'UTF-8';
 
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(member => `>${member.accession} ${member.description.trimEnd()} OX=${member.tax_id1 ? member.tax_id1.id : '0'} OS=${member.tax_id1 ? member.tax_id1.name : 'unknown'} Flag=${member.flag}\n${aaDb.data(aaDb.id(member.accession).value).toString('ascii')}`).join(''),
+                chunk => chunk.map(member => `>${member.accession} ${member.description.trimEnd()} OX=${member.tax_id ? member.tax_id.id : '0'} OS=${member.tax_id ? member.tax_id.name : 'unknown'} Flag=${member.flag}\n${aaDb.data(aaDb.id(member.accession).value).toString('ascii')}`).join(''),
                 chunk => res.write(chunk));
 
             res.end();
@@ -639,7 +703,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
 
 app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
     let result = await sql.all(`
-        SELECT tax_id1
+        SELECT tax_id1, tax_id2
             FROM member
             WHERE intclu_rep_accession = ?;
         `, req.params.cluster); 
@@ -650,16 +714,30 @@ app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
         if (tree.nodeExists(x.tax_id1) == false) {
             return;
         }
-        let node = tree.getNode(x.tax_id1);
-        while (node.id != 1) {
-            if (node.id in suggestions || count >= 10) {
+        if (tree.nodeExists(x.tax_id2) == false) {
+            return;
+        }
+        let node1 = tree.getNode(x.tax_id1);
+        let node2 = tree.getNode(x.tax_id2);
+        while (node1.id != 1) {
+            if (node1.id in suggestions || count >= 10) {
                 break;
             }
-            if (node.name.toLowerCase().includes(req.params.suggest.toLowerCase())) {
-                suggestions[node.id] = node;
+            if (node1.name.toLowerCase().includes(req.params.suggest.toLowerCase())) {
+                suggestions[node1.id] = node1;
                 count++;
             }
-            node = tree.getNode(node.parent);
+            node1 = tree.getNode(node1.parent);
+        }
+        while (node2.id != 1) {
+            if (node2.id in suggestions || count >= 10) {
+                break;
+            }
+            if (node2.name.toLowerCase().includes(req.params.suggest.toLowerCase())) {
+                suggestions[node2.id] = node2;
+                count++;
+            }
+            node2 = tree.getNode(node2.parent);
         }
     });
     res.send(Object.values(suggestions));
