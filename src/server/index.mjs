@@ -912,6 +912,16 @@ app.get('/api/structure/:structure', async (req, res) => {
     res.send({ seq: aa, coordinates: result, plddt: null });
 });
 
+app.get('/api/chainid/:accession', async (req, res) => {
+    const accession = req.params.accession;
+    let result = await sql.get(`
+        SELECT chain1_id, chain2_id
+            FROM member
+            WHERE accession = ?;
+        `, accession);
+    res.send(result);
+});
+
 app.use((err, req, res, next) => {
     console.log(err);
     res.status(500);

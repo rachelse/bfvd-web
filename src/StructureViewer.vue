@@ -248,9 +248,21 @@ export default {
             a.click();
         },
 
-        toggleFullscreen() { // FIXME: not working
-            this.plugin.managers.interactivity.setProps({ isFullscreen: !this.isFullscreen });
-            this.isFullscreen = !this.isFullscreen;
+        async toggleFullscreen() {
+            if (!this.plugin) return;
+            const element = this.$refs.structurepanel;
+            
+            if (!document.fullscreenElement) {
+                if (element.requestFullscreen) {
+                    await element.requestFullscreen();
+                } else if (element.webkitRequestFullscreen) {
+                    await element.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                }
+            }
         },
 
         async fetchStructure(accession) {
@@ -300,8 +312,10 @@ export default {
         'second': {
             async handler(val) {
                 if (!val || val === "" || !this.plugin) return;
-                
-                const secondData = await this.fetchStructure(val);
+                const response = await this.$axios.get("/chainid/" + val);
+                if (!response || !response.data) return;
+
+                const secondData = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id);
                 this.secondComponent = secondData;
 
                 // Here you would integrate your transformStructure logic
@@ -314,9 +328,25 @@ export default {
     },
     async mounted() {
         await this.initMolstar();
+        
+        const fullscreenHandler = () => {
+            this.isFullscreen = !!document.fullscreenElement;
+            if (this.plugin) {
+                this.plugin.canvas3d.handleResize();
+                this.plugin.managers.camera.reset();
+            }
+        };
+
+        document.addEventListener('fullscreenchange', fullscreenHandler);
+        document.addEventListener('webkitfullscreenchange', fullscreenHandler);
+
         if (this.cluster) this.fetchDimerStructure(this.chain1_id, this.chain2_id);
+
+        this._fullscreenHandler = fullscreenHandler;
     },
     beforeDestroy() {
+        document.removeEventListener('fullscreenchange', this._fullscreenHandler);
+        document.removeEventListener('webkitfullscreenchange', this._fullscreenHandler);
         this.plugin?.dispose();
     }
 }

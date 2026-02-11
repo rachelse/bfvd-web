@@ -118,7 +118,8 @@
             Representative structure
         </template>
         <template v-slot:content v-if="response">
-            <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" :chain1_id="response.chain1_id" :chain2_id="response.chain2_id" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
+            <!-- Hack: to fetch superposition id as string -->
+            <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="String(second)" :chain1_id="response.chain1_id" :chain2_id="response.chain2_id" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
         </template>
     </Panel>
     </v-flex>
