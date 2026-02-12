@@ -34,6 +34,7 @@
                                 dark
                             >
                                 <v-tab>UniProt</v-tab>
+                                <v-tab>Cluster ID</v-tab>
                                 <!-- <v-tab>Gene Ontology</v-tab>
                                 <v-tab>Taxonomy</v-tab> -->
                                 <v-tab>Structure</v-tab>
@@ -49,6 +50,43 @@
                                         :disabled="inSearch"
                                         @click:append="search"
                                         @keyup.enter="search"
+                                        @change="selectedExample = null"
+                                        @keydown="error = null"
+                                        :error="error != null"
+                                        :error-messages="error ? error : []"
+                                        dark
+                                        >
+                                    </v-text-field>
+                                    
+                                    <template>
+                                        <h2 class="text-h6 mb-2">
+                                            Examples: TODO
+                                        </h2>
+                                        <v-chip-group
+                                            column
+                                            dark
+                                            v-model="selectedExample"
+                                            style="max-width: 400px; margin: 0 auto; "
+                                        >
+
+                                            <v-chip v-for="item in examples" :key="item.id"
+                                                outlined v-on:click="query=item.id" >
+                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
+                                            </v-chip>
+                                        </v-chip-group>
+                                    </template>
+                                </v-tab-item>
+                
+                                <v-tab-item>
+                                    <v-text-field
+                                        outlined
+                                        label="Cluster ID"
+                                        style="max-width: 400px; margin: 0 auto;"
+                                        v-model="query"
+                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
+                                        :disabled="inSearch"
+                                        @click:append="searchCluster"
+                                        @keyup.enter="searchCluster"
                                         @change="selectedExample = null"
                                         @keydown="error = null"
                                         :error="error != null"
@@ -252,6 +290,25 @@ export default {
             this.$axios.get("/" + this.query)
                 .then(response => {
                     this.$router.push({ name: 'cluster', params: { cluster: response.data[0].intclu_rep_accession } })
+                })
+                .catch((err) => {
+                    if (err.response && err.response.data && err.response.data.error) {
+                        this.error = err.response.data.error;
+                    } else {
+                        this.error = "Unknown error";
+                    }
+                })
+                .finally(() => {
+                    this.inSearch = false;
+                });
+        },
+        searchCluster() {
+            this.inSearch = true;
+            this.error = null;
+            this.$axios.get("/cluster/" + this.query)
+                .then(response => {
+                    console.log(response.data);
+                    this.$router.push({ name: 'cluster', params: { cluster: response.data.intclu_rep_accession } })
                 })
                 .catch((err) => {
                     if (err.response && err.response.data && err.response.data.error) {
