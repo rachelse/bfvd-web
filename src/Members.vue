@@ -42,13 +42,21 @@
     >
         <template v-slot:item.accession="prop">
             <ExternalLinks :accession="prop.item.pdb_id.toUpperCase()" reference="PDB" simple></ExternalLinks><br>
-            {{ prop.item.description }}
+            <span class="caption text--darken-1">{{ prop.item.description }}</span>
         </template>
         <template v-slot:item.chains="prop">
-            {{ prop.item.chain1 }}:{{ prop.item.chain2 }}
+            <div>{{ prop.item.chain1 }}</div>
+            <div>{{ prop.item.chain2 }}</div>
         </template>
         <template v-slot:item.uniprot="prop">
-            <ExternalLinks :accession="prop.item.uniprot_id1" simple />:&nbsp;<ExternalLinks :accession="prop.item.uniprot_id2" simple />
+            <div>
+                <span v-if ="prop.item.uniprot_id1 !== null"><ExternalLinks :accession="prop.item.uniprot_id1" simple></ExternalLinks></span>
+                <span v-else>N/A</span>
+            </div>
+            <div>
+                <span v-if ="prop.item.uniprot_id2 !== null"><ExternalLinks :accession="prop.item.uniprot_id2" simple></ExternalLinks></span>
+                <span v-else>N/A</span>
+            </div>
         </template>
         <template v-slot:header.structure="{ header }">
             {{ header.text }}
@@ -87,9 +95,9 @@
                             <span>
                                 <img width="600" src="./assets/cluster_step.jpg"><br>
                                 <!-- TODO -->
-                                Interface Representative: <br>
-                                Dimer Representative: <br>
-                                Member: <br>
+                                Interface Representative: TODO <br>
+                                Dimer Representative: TODO <br>
+                                Member: TODO <br>
                                 <!-- AFDB/Foldseek: Clustered with structural similarity<br> -->
                                 <!-- AFDB50/Mmseqs: Clustered at sequence identity 50%<br> -->
                                 <!-- Fragment: Removed fragments among AFDB50<br> -->
@@ -105,7 +113,6 @@
                         <Fragment :flag="1"></Fragment>
                         <Fragment :flag="2"></Fragment>
                         <Fragment :flag="3"></Fragment>
-                        <Fragment :flag="4"></Fragment>
                     </v-chip-group>
                 </v-card>
             </v-menu>
@@ -120,7 +127,8 @@
                 </TaxonomyAutocomplete>
         </template>
         <template v-slot:item.tax_id="prop">
-            <TaxSpan :taxonomy="prop.item.tax_id1"></TaxSpan>:<TaxSpan :taxonomy="prop.item.tax_id2"></TaxSpan>
+            <div><TaxSpan :taxonomy="prop.item.tax_id1"></TaxSpan></div>
+            <div><TaxSpan :taxonomy="prop.item.tax_id2"></TaxSpan></div>
         </template>
 
         <template v-slot:item.actions="{ item }">
@@ -169,13 +177,13 @@ export default {
                     text: "PDB ID",
                     value: "accession",
                     sortable: false,
-                    width: "15%",
+                    width: "25%",
                 },
                 {
-                    text: "Dimer",
+                    text: "Chains",
                     value: "chains",
                     sortable: false,
-                    width: "15%",
+                    width: "10%",
                 },
                 {
                     text: "UniProt ID",
@@ -189,16 +197,16 @@ export default {
                 //     sortable: false,
                 // },
                 {
+                    text: "Taxonomy",
+                    value: "tax_id",
+                    sortable: false,
+                    width: "50%",
+                },
+                {
                     text: "Clustered step",
                     value: "flag",
                     sortable: false,
                     width: "10%",
-                },
-                {
-                    text: "Taxonomy",
-                    value: "tax_id",
-                    sortable: false,
-                    width: "40%",
                 },
                 {
                     text: 'Actions',

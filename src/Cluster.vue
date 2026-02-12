@@ -17,10 +17,12 @@
                 <h3>Representative: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
             </div>
             <p class="mb-0 mt-0 text-body-3">
-                {{ response.description }}&nbsp;}}
+                {{ response.description }} | 
+                {{ response.protein1_status == true ? "Protein" : "Peptide" }}-{{ response.protein2_status == true ? "Protein" : "Peptide" }} |
+                {{ response.iftype1 == 2 ? "Ordered" : (response.iftype1 == 1 ? "Disordered" : "Unannotated") }}-{{ response.iftype2 == 2 ? "Ordered" : (response.iftype2 == 1 ? "Disordered" : "Unannotated") }} Interaction
             </p>
 
-            <v-simple-table dense>
+            <v-simple-table dense class="representative-table">
                 <template v-slot:default>
                     <thead>
                         <tr>
@@ -32,8 +34,9 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td class="font-weight-bold">{{ response.chain1 }}</td>
-                            <td><ExternalLinks :accession="response.uniprot_id1" /></td>
+                            <td>{{ response.chain1 }}</td>
+                            <td v-if="response.uniprot_id1  !== null"><ExternalLinks :accession="response.uniprot_id1" /></td>
+                            <td v-else>N/A</td>
                             <td>
                                 <dd v-if="!showLineage">
                                     {{ response.tax_id1.name }}
@@ -47,8 +50,9 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="font-weight-bold">{{ response.chain2 }}</td>
-                            <td><ExternalLinks :accession="response.uniprot_id2" /></td>
+                            <td>{{ response.chain2 }}</td>
+                            <td v-if="response.uniprot_id2 !== null"><ExternalLinks :accession="response.uniprot_id2" /></td>
+                            <td v-else>N/A</td>
                             <td>
                                 <dd v-if="!showLineage">
                                     {{ response.tax_id2.name }}
@@ -78,31 +82,39 @@
                     </span>
                 </v-tooltip>
             </h3>
-                <dl class="dl-4">
-                <div>
-                <dt>
-                    Number of members
-                </dt>
-                <dd>
-                    {{ response.n_mem }}
-                </dd>
-                </div>
-                <!-- <div>
-                <dt>
-                    Average length
-                </dt>
-                <dd>
-                    {{ response.avg_len.toFixed(2) }} aa
-                </dd>
-                </div> -->
-                <div style=" grid-area: 2 / 1 / 3 / 5;">
-                <dt>
-                    Lowest common ancestor and lineage
-                </dt>
-                <dd>
-                    <template v-for="(taxonomy, index) in response.lineage" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></template>
-                </dd>
-                </div>
+                <dl class="dl-3">
+                    <div>
+                    <dt>
+                        Number of members
+                    </dt>
+                    <dd>
+                        {{ response.n_mem }}
+                    </dd>
+                    </div>
+
+                    <div style="grid-area: 1/2/3/4">
+                    <dt class="mb-0">Interaction Orderedness</dt>
+                    <dd class="mt-0 dd-tight">
+                        <svg ref="barOrderDisorder" class="chart" viewBox="0 0 400 60" preserve-aspect-ratio="none"></svg>
+
+                    </dd>
+                    </div>
+
+                    <div style="grid-area: 2/2/3/4">
+                    <dt class="mb-0">Secondary Structure Composition</dt>
+                    <dd class="mt-0 dd-tight">
+                        <svg ref="barSS" class="chart"></svg>
+                    </dd>
+                    </div>
+
+                    <div style=" grid-area: 3 / 1 / 4 / 4;">
+                    <dt>
+                        Lowest common ancestor and lineage
+                    </dt>
+                    <dd>
+                        <template v-for="(taxonomy, index) in response.lineage" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></template>
+                    </dd>
+                    </div>
                 </dl>
             <template v-if="response && response.warning == true">
                 <v-divider  style="margin-top:0.5em"></v-divider>
@@ -144,6 +156,7 @@ import Members from "./Members.vue";
 import TaxSpan from "./TaxSpan.vue";
 import ExternalLinks from "./ExternalLinks.vue";
 import Similars from "./Similars.vue";
+import { drawStackedBar } from './Utils.js';
 // import Annotations from "./Annotations.vue";
 
 export default {
@@ -168,8 +181,30 @@ export default {
     },
     mounted() {
         this.fetchData();
+        window.addEventListener('resize', this.redrawCharts);
     },
     watch: {
+        response: {
+            immediate: true,
+            handler() {
+                this.$nextTick(() => {
+                if (!this.response) return;
+
+                drawStackedBar(this.$refs.barOrderDisorder, [
+                    { label: 'Disorder-Disorder', value: this.response.ord_disdis_pct },
+                    { label: 'Order-Disorder',   value: this.response.ord_disord_pct },
+                    { label: 'Order-Order',      value: this.response.ord_ordord_pct },
+                    { label: 'Unannotated',          value: this.response.ord_unanno_pct },
+                ], { isFraction: true });
+                drawStackedBar(this.$refs.barSS, [
+                    { label: 'Mixed α/β',   value: this.response.ss_mixedaB_pct },
+                    { label: 'Mostly α',    value: this.response.ss_mostlya_pct },
+                    { label: 'Only α/β',    value: this.response.ss_onlyaB_pct },
+                    { label: 'Other',       value: this.response.ss_other_pct },
+                ], { isFraction: true });
+                });
+            }
+        },
         $route(to, from) {
             if (to.params.cluster === from.params.cluster) {
                 return;
@@ -207,6 +242,21 @@ export default {
                 .finally(() => {
                     this.fetching = false;
                 });
+        },
+        redrawCharts() {
+            if (!this.response) return;
+            drawStackedBar(this.$refs.barOrderDisorder, [
+                { label: 'Disorder-Disorder', value: this.response.ord_disdis_pct },
+                { label: 'Order-Disorder',   value: this.response.ord_disord_pct },
+                { label: 'Order-Order',      value: this.response.ord_ordord_pct },
+                { label: 'Unannotated',          value: this.response.ord_unanno_pct },
+            ], { isFraction: true });
+            drawStackedBar(this.$refs.barSS, [
+                { label: 'Mixed α/β',   value: this.response.ss_mixedaB_pct },
+                { label: 'Mostly α',    value: this.response.ss_mostlya_pct },
+                { label: 'Only α/β',    value: this.response.ss_onlyaB_pct },
+                { label: 'Other',       value: this.response.ss_other_pct },
+            ], { isFraction: true });
         }
     }
 }
@@ -220,20 +270,37 @@ dl {
   padding-bottom: 1em;
   grid-gap: 1em;
 }
+
+.chart {
+    display: block;
+    margin-top: 0;
+    width: 100%;
+    height: 60px;   /* keep height fixed */
+}
+
 .dl-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-
 .dl-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.dl-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
 
 dt {
     font-weight: bold;
+}
+
+.dd-tight {
+  margin-left: 0 !important;  /* remove default dd indent */
+  margin-top: 0 !important;
+}
+
+.dd-tight svg {
+  display: block;
+}
+
+::v-deep .representative-table tbody tr:hover{
+    background-color: #fffbbb !important; /* TODO: change color and make it selectable */
 }
 
 @media screen and (min-width: 961px) {
