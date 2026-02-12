@@ -47,7 +47,7 @@ checkpoints.push(caDb.make(dataPath + '/afdb_ca', dataPath + '/afdb_ca.index'));
 // checkpoints.push(plddtDB.make(dataPath + '/afdb_plddt', dataPath + '/afdb_plddt.index'));
 
 const descDB = new DbReader();
-checkpoints.push(descDB.make(dataPath + '/afdb_desc', dataPath + '/afdb_desc.index'));
+checkpoints.push(descDB.make(dataPath + '/pdb_desc', dataPath + '/pdb_desc.index'));
 
 // const avaDb = new DbReader();
 // checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
@@ -568,10 +568,10 @@ app.get('/api/cluster/:cluster', async (req, res) => {
     result.tax_id2 = tree.nodeExists(result.tax_id2) ? tree.getNode(result.tax_id2) : null;
     result.rep_lineage1 = tree.nodeExists(result.tax_id1.id) ? tree.lineage(result.tax_id1) : null;
     result.rep_lineage2 = tree.nodeExists(result.tax_id2.id) ? tree.lineage(result.tax_id2) : null;
-    result.description = getDescription(result.rep_accession); // TODO
+    result.description = getDescription(result.intclu_rep_accession);
 
     if (warnDB) {
-        const warnKey = warnDB.id(result.rep_accession);
+        const warnKey = warnDB.id(result.intclu_rep_accession);
         result.warning = warnKey.found;
     } else {
         result.warning = false;
@@ -915,7 +915,7 @@ app.get('/api/structure/:structure', async (req, res) => {
 app.get('/api/chainid/:accession', async (req, res) => {
     const accession = req.params.accession;
     let result = await sql.get(`
-        SELECT chain1_id, chain2_id
+        SELECT chain1_id, chain2_id, chain1, chain2
             FROM member
             WHERE accession = ?;
         `, accession);

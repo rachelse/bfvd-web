@@ -12,9 +12,13 @@
         </template>
 
         <template v-slot:content v-if="response">
-            <div class="d-flex align-center justify-space-between mb-2">
-                <h3>Representative PDB: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
+            <div class="d-flex align-center justify-space-between mb-0">
+                <!-- <h3 class="mb-0 mt-0">Representative Summary</h3> -->
+                <h3>Representative: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
             </div>
+            <p class="mb-0 mt-0 text-body-3">
+                {{ response.description }}&nbsp;}}
+            </p>
 
             <v-simple-table dense>
                 <template v-slot:default>
@@ -39,7 +43,7 @@
                                 </dd>
                             </td>
                             <td class="caption grey--text text-truncate" style="max-width: 150px;">
-                                {{ response.description }}
+                                TODO: CHANGE
                             </td>
                         </tr>
                         <tr>
@@ -54,7 +58,7 @@
                                 </dd>
                             </td>
                             <td class="caption grey--text text-truncate" style="max-width: 150px;">
-                                {{ response.description }}
+                                TODO: CHANGE
                             </td>
                         </tr>
                     </tbody>
@@ -118,8 +122,7 @@
             Representative structure
         </template>
         <template v-slot:content v-if="response">
-            <!-- Hack: to fetch superposition id as string -->
-            <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="String(second)" :chain1_id="response.chain1_id" :chain2_id="response.chain2_id" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
+            <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
         </template>
     </Panel>
     </v-flex>

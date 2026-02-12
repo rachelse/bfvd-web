@@ -6,9 +6,9 @@
 
 sqlite3 $1 << EOF
 CREATE TABLE member (
-	accession INTEGER PRIMARY KEY,
-	diclu_rep_accession INTEGER,
-	intclu_rep_accession INTEGER,
+	accession TEXT PRIMARY KEY,
+	diclu_rep_accession TEXT,
+	intclu_rep_accession TEXT,
 	tax_id1 TEXT,
 	tax_id2 TEXT,
 	flag INTEGER,
@@ -17,12 +17,16 @@ CREATE TABLE member (
 	pdb_id TEXT,
 	chain1 TEXT,
 	chain2 TEXT,
-	chain1_id INTEGER,
-	chain2_id INTEGER
+	chain1_id TEXT,
+	chain2_id TEXT,
+	protein1_status BOOLEAN,
+	protein2_status BOOLEAN,
+	iftype1 INTEGER,
+	iftype2 INTEGER
 );
 
 CREATE TABLE cluster (
-	intclu_rep_accession INTEGER PRIMARY KEY,
+	intclu_rep_accession TEXT PRIMARY KEY,
 	n_mem INTEGER,
 	lca_tax_id INTEGER,
 	lca_tax_chain1_id INTEGER,
@@ -40,9 +44,9 @@ PRAGMA max_page_limit=13107200;
 .mode tabs
 
 CREATE TABLE tmpMember (
-	intclu_id INTEGER,
-	diclu_id INTEGER,
-	mem_id INTEGER,
+	intclu_id TEXT,
+	diclu_id TEXT,
+	mem_id TEXT,
 	flag INTEGER,
 	tax_id1 INTEGER,
 	tax_id2 INTEGER,
@@ -51,12 +55,16 @@ CREATE TABLE tmpMember (
 	chain2 TEXT,
 	uniprot_id1 TEXT,
 	uniprot_id2 TEXT,
-	chain1_id INTEGER,
-	chain2_id INTEGER
+	chain1_id TEXT,
+	chain2_id TEXT,
+	protein1_status BOOLEAN,
+	protein2_status BOOLEAN,
+	iftype1 INTEGER,
+	iftype2 INTEGER
 );
 
 CREATE TABLE tmpCluster (
-	rep_id INTEGER,
+	rep_id TEXT,
 	n_mem INTEGER,
 	lca_tax_id INTEGER,
 	lca_tax_chain1_id INTEGER,
@@ -72,9 +80,11 @@ SET pdb_id = SUBSTR(pdb_id, 1, INSTR(pdb_id, '-assembly') - 1);
 
 -- Insert members & index on accession
 INSERT INTO member (accession, diclu_rep_accession, intclu_rep_accession, flag, 
-					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2, chain1_id, chain2_id)
+					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, 
+					chain1, chain2, chain1_id, chain2_id, protein1_status, protein2_status, iftype1, iftype2)
 SELECT mem_id, diclu_id, intclu_id, flag, 
-		tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, chain1, chain2, chain1_id, chain2_id
+		tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, 
+		chain1, chain2, chain1_id, chain2_id, protein1_status, protein2_status, iftype1, iftype2
 FROM tmpMember;
 
 -- Index on member accessions
@@ -108,4 +118,3 @@ ON cluster(lca_tax_id);
 DROP TABLE IF EXISTS tmpMember;
 DROP TABLE IF EXISTS tmpCluster;
 EOF
-

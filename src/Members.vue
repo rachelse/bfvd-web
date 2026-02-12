@@ -42,7 +42,7 @@
     >
         <template v-slot:item.accession="prop">
             <ExternalLinks :accession="prop.item.pdb_id.toUpperCase()" reference="PDB" simple></ExternalLinks><br>
-            {{ prop.item.description }} TODO
+            {{ prop.item.description }}
         </template>
         <template v-slot:item.chains="prop">
             {{ prop.item.chain1 }}:{{ prop.item.chain2 }}
