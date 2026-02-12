@@ -569,6 +569,12 @@ app.get('/api/cluster/:cluster', async (req, res) => {
     result.rep_lineage1 = tree.nodeExists(result.tax_id1.id) ? tree.lineage(result.tax_id1) : null;
     result.rep_lineage2 = tree.nodeExists(result.tax_id2.id) ? tree.lineage(result.tax_id2) : null;
     result.description = getDescription(result.intclu_rep_accession);
+    if ( result.uniprot_id1 == "nan" || result.uniprot_id1 == "" ) {
+        result.uniprot_id1 = null;
+    }
+    if ( result.uniprot_id2 == "nan" || result.uniprot_id2 == "" ) {
+        result.uniprot_id2 = null;
+    }
 
     if (warnDB) {
         const warnKey = warnDB.id(result.intclu_rep_accession);
@@ -633,6 +639,12 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
                 }
                 currNode = tree.getNode(currNode.parent);
             }
+            if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
+                x.uniprot_id1 = null;
+            }
+            if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
+                x.uniprot_id2 = null;
+            }
             return false;
         });
         
@@ -663,6 +675,12 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             x.tax_id1 = tree.nodeExists(x.tax_id1) ? tree.getNode(x.tax_id1) : null;
             x.tax_id2 = tree.nodeExists(x.tax_id2) ? tree.getNode(x.tax_id2) : null;
             x.description = getDescription(x.accession);
+            if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
+                x.uniprot_id1 = null;
+            }
+            if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
+                x.uniprot_id2 = null;
+            }
         });
     }
 
