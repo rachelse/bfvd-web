@@ -12,25 +12,21 @@ export default {
     props: ["flag"],
     computed: {
         flagText() {
-            if (this.flag == 1) {
-                return "AFDB50/MMseqs2";
+            if (this.flag == 0) {
+                return "Member";
+            } else if (this.flag == 1) {
+                return "Dimer Rep.";
             } else if (this.flag == 2) {
-                return "AFDB/Foldseek";
-            } else if (this.flag == 3) {
-                return "Fragment";
-            } else if (this.flag == 4) {
-                return "Singleton";
+                return "Interface Rep.";
             }
         },
         flagColor() {
-            if (this.flag == 1) {
+            if (this.flag == 0) {
                 return "#8FB5D6";
-            } else if (this.flag == 2) {
+            } else if (this.flag == 1) {
                 return "#9ED19F";
-            } else if (this.flag == 3) {
+            } else if (this.flag == 2) {
                 return "#C29BFF";
-            } else if (this.flag == 4) {
-                return "#FFC8C1";
             }
         }
     }
