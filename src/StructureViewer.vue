@@ -102,12 +102,23 @@
 import { createPluginUI } from 'molstar/lib/mol-plugin-ui/index.js';
 import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18.js';
 import { DefaultPluginUISpec } from 'molstar/lib/mol-plugin-ui/spec.js';
+import { Vec3 } from 'molstar/lib/mol-math/linear-algebra';
+import { Segmentation } from 'molstar/lib/mol-data/int';
+import { StructureSelection, QueryContext, StructureElement,  } from 'molstar/lib/mol-model/structure';
+import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder';
+import { compile } from 'molstar/lib/mol-script/runtime/query/compiler';
+import { canvasToBlob } from 'molstar/lib/mol-canvas3d/util';
+import { encode_mmCIF_categories_default, CifExportContext } from 'molstar/lib/mol-model/structure/export/mmcif';
+import { ObjExporter } from 'molstar/lib/extensions/geo-export/obj-exporter';
 import { StateTransforms } from 'molstar/lib/mol-state/transform.js';
 import { Mat4 } from 'molstar/lib/mol-math/linear-algebra.js';
 import { Color } from 'molstar/lib/mol-util/color/index.js';
+import { isProtein, MoleculeType } from 'molstar/lib/mol-model/structure/model/types';
 
 import Panel from './Panel.vue';
 import { pulchra } from 'pulchra-wasm';
+import { transform } from '@vue/compiler-dom';
+import { CifWriter } from 'molstar/lib/mol-io/writer/cif';
 
 // TM-align worker setup stays same
 const worker = new Worker(new URL('./tmalign-worker.js', import.meta.url));
@@ -128,42 +139,141 @@ const oneToThree = {
   "U":"SEC", "O":"PHL", "X":"XAA"
 };
 
-// function mockPDB(ca, seq, chain = 'A') {
-//     const chainLength = ca.length / 3;
-//     const pdb = [];
-//     let j = 0;
-//     for (let i = 0; i < ca.length; i+=3, j++) {
-//         const line = 'ATOM  '
-//             + (j+1).toString().padStart(5)
-//             + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == seq.length ? seq[i/3] : 'A'] + ' ' + chain
-//             + (j+1).toString().padStart(4)
-//             + '    '
-//             + ca[0 * chainLength + j].toFixed(3).padStart(8)
-//             + ca[1 * chainLength + j].toFixed(3).padStart(8)
-//             + ca[2 * chainLength + j].toFixed(3).padStart(8)
-//             + '  1.00  0.00           C  ';
-//         pdb.push(line);
-//     }
-//     return pdb.join('\n');
-// }
+function setChainName(structure, chainName) {
+    const lines = structure.split('\n');
+    let chainname = chainName;
+    if (chainName.length > 1) {
+        chainname = chainName.slice(0,1); // PDB format limitation
+    }
+    const newLines = lines.map(line => {
+        if (line.startsWith('ATOM') || line.startsWith('HETATM')) {
+            return line.slice(0, 21) + chainname + line.slice(22);
+        }
+        return line;
+    });
+    return newLines.join('\n');
+}
+function chainSelection(auth_asym_id) {
+    return MS.struct.generator.atomGroups({
+        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), auth_asym_id])
+    });
+}
+async function addChainRepresentation(
+    plugin, structure, chain, label, color
+) {
+    const component = await plugin.builders.structure.tryCreateComponentFromExpression(
+        structure,
+        chainSelection(chain),
+        label
+    );
+    if (component) {
+        await plugin.builders.structure.representation.addRepresentation(component, {
+            type: 'cartoon',
+            color: 'uniform',
+            colorParams: { value: color }
+        });
+    }
+}
+
+function getCAPositions(unit) {
+    const { elements, model } = unit;
+    const { chainAtomSegments, residueAtomSegments, atoms } = model.atomicHierarchy;
+
+    const atomId = atoms.label_atom_id;
+
+    const chainIt = Segmentation.transientSegments(chainAtomSegments, elements);
+    const residueIt = Segmentation.transientSegments(residueAtomSegments, elements);
+
+    const caUnitIndex = [];
+
+    while (chainIt.hasNext) {
+        const chainSeg = chainIt.move();
+        residueIt.setSegment(chainSeg);
+
+        while (residueIt.hasNext) {
+            const r = residueIt.move();
+            let found = -1;
+
+            for (let ui = r.start; ui < r.end; ui++) {
+                const e = elements[ui];
+                if (atomId.value(e) === 'CA') { found = ui; break;}
+            }
+
+            caUnitIndex.push(found);
+        }
+    }
+    return caUnitIndex;
+}
+
+async function getInterfaceResidues(structure, chain1, chain2, thresholdSq = 8.0 * 8.0) {
+    
+    let { units } = structure.data;
+    units = units.filter(unit => { // Make sure we only have protein chains
+        return isProtein(unit.model.atomicHierarchy.derived.residue.moleculeType[0]);
+    });
+    
+    if (units.length < 2) {
+        console.warn("Structure does not have two chains for interface detection.");
+        return;
+    }
+
+    const u1 = units[0];
+    const u2 = units[1];
+
+    const caQuery1 = compile(MS.struct.generator.atomGroups({
+        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'A']),
+        'atom-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.label_atom_id(), 'CA'])
+    }));
+    const structuredata = structure.obj.data;
+    const sel1 = StructureSelection.toLociWithCurrentUnits(caQuery1(new QueryContext(structuredata)));
+    const caloci1 = StructureElement.Loci.is(sel1) ? sel1 : StructureElement.Loci.none(structuredata);
+
+    const caQuery2 = compile(MS.struct.generator.atomGroups({
+        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chain2]),
+        'atom-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.label_atom_id(), 'CA'])
+    }));
+    const sel2 = StructureSelection.toLociWithCurrentUnits(caQuery2(new QueryContext(structuredata)));
+    const caloci2 = StructureElement.Loci.is(sel2) ? sel2 : StructureElement.Loci.none(structuredata);
+    
+    const interfaceResidues1 = new Set();
+    const interfaceResidues2 = new Set();
+    const v1 = Vec3();
+    const v2 = Vec3();
+
+    for (let i = 0; i < caloci1.elements[0].indices.length; i++) {
+        const e1 = caloci1.elements[0].indices[i];
+        u1.conformation.position(u1.elements[e1], v1);
+        for (let j = 0; j < caloci2.elements[0].indices.length; j++) {
+            const e2 = caloci2.elements[0].indices[j];
+
+            u2.conformation.position(u2.elements[e2], v2);
+            const d2 = Vec3.squaredDistance(v1, v2);
+            if (d2 < thresholdSq) {
+                interfaceResidues1.add(i);
+                interfaceResidues2.add(j);
+            }
+        }
+    }
+  
+    // await addChainRepresentation(this.plugin, struct1.structure, chain1, "JO", 0xFF0000);
+    
+    return { interfaceResidues1, interfaceResidues2 };
+}
+
 function mockPDB(ca, seq, chain = 'A') {
     const chainLength = ca.length / 3;
     const pdb = [];
     let j = 0;
-    for (let i = 0; i < ca.length; i += 3, j++) {
-        // Force conversion to Number to prevent .toFixed error
-        const x = Number(ca[0 * chainLength + j]);
-        const y = Number(ca[1 * chainLength + j]);
-        const z = Number(ca[2 * chainLength + j]);
 
+    for (let i = 0; i < ca.length; i+=3, j++) {
         const line = 'ATOM  '
-            + (j + 1).toString().padStart(5)
-            + '  CA  ' + (oneToThree[seq != "" && (ca.length / 3) == seq.length ? seq[i / 3] : 'A'] || 'ALA') + ' ' + chain
-            + (j + 1).toString().padStart(4)
+            + j.toString().padStart(5)
+            + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == seq.length ? seq[i/3] : 'A'] + ' ' + chain
+            + j.toString().padStart(4)
             + '    '
-            + x.toFixed(3).padStart(8) // Now safe to call .toFixed
-            + y.toFixed(3).padStart(8)
-            + z.toFixed(3).padStart(8)
+            + ca[0 * chainLength + j].toString().padStart(8)
+            + ca[1 * chainLength + j].toString().padStart(8)
+            + ca[2 * chainLength + j].toString().padStart(8)
             + '  1.00  0.00           C  ';
         pdb.push(line);
     }
@@ -177,14 +287,15 @@ export default {
         component: null, // Primary Structure
         secondComponent: null, // Superposed Structure
         tmOutput: null,
+        interfaceMap: null,
         'isFullscreen': false,
         'hovered': false,
     }),
     props: {
         'cluster': { type: String, required: true },
         'second': { type: String, required: true },
-        'chain1_id': { type: Number, required: true },
-        'chain2_id': { type: Number, required: true },
+        // 'chain1': { type: String, required: true },
+        // 'chain2': { type: String, required: true },
         'toolbar': { type: Boolean, default: true },
         'bgColorLight': { type: String, default: "0xffffff" },
         'bgColorDark': { type: String, default: "0xeeeeee" },
@@ -202,7 +313,10 @@ export default {
                     }
                 },
                 canvas3d: {
-                    renderer: { backgroundColor: colorNum },
+                    renderer: {
+                        // transparentBackground: true
+                        backgroundColor: colorNum 
+                    },
                 }
             };
 
@@ -213,24 +327,24 @@ export default {
             });
         },
 
-        async loadPdbData(pdbString, colorHex = null) {
+        async loadPdbStructure(pdbString, colorHex = null) {
             const data = await this.plugin.builders.data.rawData({ data: pdbString });
             const trajectory = await this.plugin.builders.structure.parseTrajectory(data, 'pdb');
-            // const model = await this.plugin.builders.structure.;
-            // console.log(model)
-            // const model = await this.plugin.builders.structure.addModel(trajectory);
-            // const structure = await this.plugin.builders.structure.addStructure(model);
-
-            // const colorProp = colorHex ? { name: 'uniform', params: { value: Color(parseInt(colorHex.replace('#', ''), 16)) } } : { name: 'chain-id' };
-
-            // const representation = await this.plugin.builders.structure.representation.addRepresentation(structure, {
-            //     type: 'cartoon',
-            //     color: colorProp.name,
-            //     colorParams: colorProp.params
-            // });
-
-            // return { structure, representation };
-            return await this.plugin.builders.structure.hierarchy.applyPreset(trajectory, "default");
+            const model = await this.plugin.builders.structure.createModel(trajectory);
+            const structure = await this.plugin.builders.structure.createStructure(model, { name: 'model', params: {} });
+            // const polymer = await this.plugin.builders.structure.tryCreateComponentStatic(structure, 'polymer');
+            // TEST
+            // const caQuery1 = compile(MS.struct.generator.atomGroups({
+            //     'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'A']),
+            //     'atom-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.label_atom_id(), 'CA'])
+            // }));
+            // const structure1data = structure.obj.data // preset.structure.cell?.obj.data;
+            // // console.log(structure1data ==  structure.obj.data)
+            // console.log(structure.obj.data)
+            // const sel1 = StructureSelection.toLociWithCurrentUnits(caQuery1(new QueryContext(structure1data)));
+            // const loci1 = StructureElement.Loci.is(sel1) ? sel1 : StructureElement.Loci.none(structure1Data);
+            // console.log(loci1)
+            return structure;
         },
 
         resetView() {
@@ -238,20 +352,28 @@ export default {
             // TODO: also reset selections
         },
 
-        async makeImage() { //FIXME: not working
-            const data = await this.plugin.helpers.viewportScreenshot.getByteData({ transparent: true, multiply: 2 });
-            const blob = new Blob([data], { type: 'image/png' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${this.cluster}.png`;
-            a.click();
+        async makeImage() {
+            if (!this.plugin) return;
+            const helper = this.plugin.helpers.viewportScreenshot;
+            helper.behaviors.values.next({
+                ...helper.values,
+                transparent: true,
+                format: { name: 'png', params: {} },
+            });
+
+            try {
+                const filename = `${this.cluster || 'structure'}.png`;
+                await helper.download(filename);
+
+            } catch (e) {
+                console.error("Error downloading image:", e);
+            }
         },
 
         async toggleFullscreen() {
             if (!this.plugin) return;
             const element = this.$refs.structurepanel;
-            
+
             if (!document.fullscreenElement) {
                 if (element.requestFullscreen) {
                     await element.requestFullscreen();
@@ -264,25 +386,73 @@ export default {
                 }
             }
         },
+        async makePdb() {
+            // Fixme: Implement PDB export (It's not working)
+            if (!this.plugin) return;
+            if (!this.component) return;
+            const header = `REMARK     This file was generated by the Foldseek clusters webserver:
+REMARK       https://todo.foldseek.com
+REMARK     Please cite:
+REMARK       https://todo
+REMARK     Warning: Please refer to the original PDB files.
+REMARK       This file was auto-generated from compressed information:
+REMARK         * Non C-alpha atoms were re-generated by PULCHRA.
+REMARK         * Residue/atom indices were sequentially renumbered`;
+            if (!this.secondComponent) {
+                // TODO
+                // const encoder = new CifWriter.Encoder();
+                // let cif = encode_mmCIF_categories_default(encoder, this.component.structure);
+                // let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
+                //                 pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
+                //                 let result =
+                // `TITLE     ${this.cluster}
+                // ${header}
+                // ${pdb}
+                // END
+                // `;
+                // download(new Blob([result], { type: 'text/plain' }), this.cluster + ".pdb");
+            } else {
+                // TODO
+                //                 let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
+                //                 pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
+                //                 let pdb2 = new PdbWriter(this.secondComponent.structure, { renumberSerial: false }).getData();
+                //                 pdb2 = pdb2.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
+                //                 let result =
+                // `TITLE     ${this.cluster}+${this.second}
+                // ${header}
+                // MODEL        1
+                // ${pdb}
+                // ENDMDL
+                // MODEL        2
+                // ${pdb2}
+                // ENDMDL
+                // END
+                // `;
+                //                 download(new Blob([result], { type: 'text/plain' }), this.cluster + '+' + this.second + ".pdb");
+            }
+        },
 
         async fetchStructure(accession) {
             const response = await this.$axios.get("/structure/" + accession);
             const pdb = await pulchra(mockPDB(response.data.coordinates, response.data.seq, 'A'));
-            return await this.loadPdbData(pdb);
+            const structure = await this.loadPdbStructure(pdb);
+            return structure
         },
 
-        async fetchDimerStructure(id1, id2) {
+        async fetchDimerStructure(id1, id2, chain1 = 'A', chain2 = 'B') {
             const [r1, r2] = await Promise.all([
                 this.$axios.get("/structure/" + id1),
                 this.$axios.get("/structure/" + id2)
             ]);
-            const pdb1 = await pulchra(mockPDB(r1.data.coordinates, r1.data.seq, 'A'));
-            const pdb2 = await pulchra(mockPDB(r2.data.coordinates, r2.data.seq, 'B'));
-            
-            // In Molstar, we load them as one "Combined" PDB or two separate components.
-            // For simplicity, we load the concatenated ATOM records.
+            let pdb1 = await pulchra(mockPDB(r1.data.coordinates, r1.data.seq));
+            let pdb2 = await pulchra(mockPDB(r2.data.coordinates, r2.data.seq));
+            // TODO: How can we set chain names if they are long?
+            pdb1 = setChainName(pdb1, 'A'); // chain1
+            pdb2 = setChainName(pdb2, 'B'); // chain2
             const combined = pdb1.split('END')[0] + '\n' + pdb2.split('END')[0];
-            return await this.loadPdbData(combined);
+
+            const structure = await this.loadPdbStructure(combined);
+            return structure;
         }
     },
     computed: {
@@ -302,9 +472,13 @@ export default {
     watch: {
         'cluster': {
             async handler(val) {
+                // TODO: Figure out when it's called
                 if (!val || !this.plugin) return;
                 await this.plugin.clear();
-                this.component = await this.fetchDimerStructure(this.chain1_id, this.chain2_id);
+                const response = await this.$axios.get("/chainid/" + val);
+                if (!response || !response.data) return;
+                structure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2);
+                this.component = await this.plugin.builders.structure.hierarchy.applyPreset(structure, "default");
                 this.resetView();
             },
             immediate: false
@@ -315,10 +489,11 @@ export default {
                 const response = await this.$axios.get("/chainid/" + val);
                 if (!response || !response.data) return;
 
-                const secondData = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id);
+                const secondStructure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2);
+                const secondData = await this.plugin.builders.structure.hierarchy.applyPreset(secondStructure, "default");
                 this.secondComponent = secondData;
 
-                // Here you would integrate your transformStructure logic
+                // TODO: Here you would integrate your transformStructure logic
                 // Molstar uses Mat4.fromArray for rotation/translation matrices
                 // this.plugin.builders.structure.transform(this.secondComponent.structure, matrix);
                 
@@ -340,7 +515,17 @@ export default {
         document.addEventListener('fullscreenchange', fullscreenHandler);
         document.addEventListener('webkitfullscreenchange', fullscreenHandler);
 
-        if (this.cluster) this.fetchDimerStructure(this.chain1_id, this.chain2_id);
+        if (!(this.cluster)) return;
+        const response = await this.$axios.get("/chainid/" + this.cluster);
+        if (!response || !response.data) return;
+
+        const structure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2);
+        await addChainRepresentation(this.plugin, structure, 'A', "Chain 1", 0x7f2a61);
+        await addChainRepresentation(this.plugin, structure, 'B', "Chain 2", 0x88d3e5);
+        // this.component = await this.plugin.builders.structure.hierarchy.applyPreset(structure, "default");
+        this.resetView();
+        // const interfaceMap = getInterfaceResidues(structure, response.data.chain1, response.data.chain2);
+        // this.interfaceMap = interfaceMap;
 
         this._fullscreenHandler = fullscreenHandler;
     },
