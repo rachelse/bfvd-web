@@ -33,7 +33,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
+                        <tr class="row-a">
                             <td>{{ response.chain1 }}</td>
                             <td v-if="response.uniprot_id1  !== null"><ExternalLinks :accession="response.uniprot_id1" /></td>
                             <td v-else>N/A</td>
@@ -46,10 +46,10 @@
                                 </dd>
                             </td>
                             <td class="caption grey--text text-truncate" style="max-width: 150px;">
-                                TODO: CHANGE
+                                <!-- TODO change -->
                             </td>
                         </tr>
-                        <tr>
+                        <tr class="row-b">
                             <td>{{ response.chain2 }}</td>
                             <td v-if="response.uniprot_id2 !== null"><ExternalLinks :accession="response.uniprot_id2" /></td>
                             <td v-else>N/A</td>
@@ -62,7 +62,7 @@
                                 </dd>
                             </td>
                             <td class="caption grey--text text-truncate" style="max-width: 150px;">
-                                TODO: CHANGE
+                                <!-- TODO: CHANGE -->
                             </td>
                         </tr>
                     </tbody>
@@ -101,13 +101,13 @@
                     </div>
 
                     <div style="grid-area: 2/2/3/4">
-                    <dt class="mb-0">Secondary Structure Composition</dt>
+                    <dt class="mb-0">Interface Secondary Structure Composition</dt>
                     <dd class="mt-0 dd-tight">
                         <svg ref="barSS" class="chart"></svg>
                     </dd>
                     </div>
 
-                    <div style=" grid-area: 3 / 1 / 4 / 4;">
+                    <div style=" grid-area: 2 / 1 / 4 / 2;">
                     <dt>
                         Lowest common ancestor and lineage
                     </dt>
@@ -278,9 +278,6 @@ dl {
     height: 60px;   /* keep height fixed */
 }
 
-.dl-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
 .dl-3 {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
 }
@@ -298,9 +295,12 @@ dt {
 .dd-tight svg {
   display: block;
 }
+.representative-table >>> tr.row-a:hover > td {
+  background-color: rgba(127, 42, 97, 0.18) !important;
+}
 
-::v-deep .representative-table tbody tr:hover{
-    background-color: #fffbbb !important; /* TODO: change color and make it selectable */
+.representative-table >>> tr.row-b:hover > td {
+  background-color: rgba(136, 211, 229, 0.18) !important;
 }
 
 @media screen and (min-width: 961px) {

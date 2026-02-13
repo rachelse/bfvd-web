@@ -1,15 +1,19 @@
 <template>
     <div class="d-inline">
-        <template v-if="isLink">
+        <template v-if="isLink">  
             <a :href="linkUrl" target="_blank" rel="noopener" class="custom-link-nohighlight">
                 <slot v-if="$slots['accession']" name="accession"></slot>
                 <template v-else>{{ accession }}</template>
             </a>
         </template>
+        <template v-else-if="reference === 'PDB'">
+            <v-btn :href="'https://www.rcsb.org/structure/' + accession" target="_blank" rel="noopener" plain text small icon>           <v-icon small>
+                {{ $MDI.OpenInNew }}
+            </v-icon></v-btn>{{ accession }}
+        </template>
         <v-menu v-else
             :close-on-content-click="false">
             <template v-slot:activator="{ on }">
-
                 <span class="d-inline-flex align-center">
                 <slot v-if="$slots['accession']" name="accession"></slot>
                 <template v-else>{{ accession }}</template>&nbsp;<v-btn v-on="on" plain text small icon>
@@ -31,13 +35,7 @@
                     </v-list-item-content>
                 </v-list-item>
             </v-list>
-            <v-list v-else-if="reference === 'PDB'">
-                <v-list-item :href="'https://www.rcsb.org/structure/' + accession" target="_blank" rel="noopener">
-                    <v-list-item-content>
-                        <v-list-item-title>PDB</v-list-item-title>
-                    </v-list-item-content>
-                </v-list-item>
-            </v-list>
+
         </v-menu>
     </div>
 </template>

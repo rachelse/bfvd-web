@@ -53,6 +53,7 @@ const router = new VueRouter({
     routes: [
         { path: '/', redirect: { name: 'search' } },
         { name: 'search', path: '/', component: Search },
+        { name: 'uniprot', path: '/uniprot/:accession', component: Search },
         { name: 'go', path: '/go/:go/:type', component: Search },
         { name: 'lca', path: '/lca/:taxid/:type', component: Search },
         { name: 'foldseek', path: '/foldseek/:jobid', component: Search },

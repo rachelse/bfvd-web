@@ -89,6 +89,7 @@ app.use((req, res, next) => {
 const fileCache = new FileCache(cachePath);
 
 function finalizeResult(result, req, res) {
+    // TODO: need to refactor code to dimers
     const is_tax_filter = req.query.tax_id1 != undefined;
     const taxonomy_suggest = req.params.taxonomy;
 
@@ -145,7 +146,7 @@ function finalizeResult(result, req, res) {
         result = result.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
     }
     result.forEach((x) => {
-        x.description = getDescription(x.rep_accession);
+        x.description = getDescription(x.intclu_rep_accession);
         if (!is_tax_filter) {
             if (x.lca_tax_id) {
                 x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
@@ -156,6 +157,33 @@ function finalizeResult(result, req, res) {
     res.send({ total: total, result : result });
     return;
 }
+
+app.get('/api/search/uniprot', async (req, res) => {
+    const accession = req.query.query_UniProt;
+    let result = await sql.all(`
+  WITH reps AS (
+    SELECT DISTINCT m.intclu_rep_accession AS rep
+    FROM member AS m
+    WHERE (m.uniprot_id1 = ? OR m.uniprot_id2 = ?)
+      AND m.intclu_rep_accession IS NOT NULL
+  )
+  SELECT m.*, c.*
+  FROM reps
+  JOIN cluster c ON c.intclu_rep_accession = reps.rep
+  JOIN member  m ON m.intclu_rep_accession = reps.rep
+  WHERE m.accession == m.intclu_rep_accession
+            
+        `, accession, accession);
+    result.forEach((x) => {
+        if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
+            x.uniprot_id1 = null;
+        }
+        if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
+            x.uniprot_id2 = null;
+        }
+    });
+    return finalizeResult(result, req, res);
+});
 
 app.get('/api/search/go/{:taxonomy}', async (req, res) => {
     const go_search_type = req.query.go_search_type;

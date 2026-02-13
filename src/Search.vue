@@ -34,10 +34,10 @@
                                 dark
                             >
                                 <v-tab>UniProt</v-tab>
-                                <v-tab>Cluster ID</v-tab>
-                                <!-- <v-tab>Gene Ontology</v-tab>
-                                <v-tab>Taxonomy</v-tab> -->
+                                <!-- <v-tab>Gene Ontology</v-tab> -->
+                                <v-tab>Taxonomy</v-tab>
                                 <v-tab>Structure</v-tab>
+                                <v-tab>Cluster ID</v-tab>
                             </v-tabs>
                             <v-tabs-items v-model="tab" style="padding: 1em;">
                                 <v-tab-item>
@@ -45,11 +45,11 @@
                                         outlined
                                         label="UniProt accession"
                                         style="max-width: 400px; margin: 0 auto;"
-                                        v-model="query"
+                                        v-model="queryUniProt"
                                         :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
                                         :disabled="inSearch"
-                                        @click:append="search"
-                                        @keyup.enter="search"
+                                        @click:append="searchUniProt"
+                                        @keyup.enter="searchUniProt"
                                         @change="selectedExample = null"
                                         @keydown="error = null"
                                         :error="error != null"
@@ -60,54 +60,17 @@
                                     
                                     <template>
                                         <h2 class="text-h6 mb-2">
-                                            Examples: TODO
+                                            Examples
                                         </h2>
                                         <v-chip-group
                                             column
                                             dark
                                             v-model="selectedExample"
-                                            style="max-width: 400px; margin: 0 auto; "
+                                            style="max-width: 600px; margin: 0 auto; "
                                         >
 
-                                            <v-chip v-for="item in examples" :key="item.id"
-                                                outlined v-on:click="query=item.id" >
-                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
-                                            </v-chip>
-                                        </v-chip-group>
-                                    </template>
-                                </v-tab-item>
-                
-                                <v-tab-item>
-                                    <v-text-field
-                                        outlined
-                                        label="Cluster ID"
-                                        style="max-width: 400px; margin: 0 auto;"
-                                        v-model="query"
-                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
-                                        :disabled="inSearch"
-                                        @click:append="searchCluster"
-                                        @keyup.enter="searchCluster"
-                                        @change="selectedExample = null"
-                                        @keydown="error = null"
-                                        :error="error != null"
-                                        :error-messages="error ? error : []"
-                                        dark
-                                        >
-                                    </v-text-field>
-                                    
-                                    <template>
-                                        <h2 class="text-h6 mb-2">
-                                            Examples: TODO
-                                        </h2>
-                                        <v-chip-group
-                                            column
-                                            dark
-                                            v-model="selectedExample"
-                                            style="max-width: 400px; margin: 0 auto; "
-                                        >
-
-                                            <v-chip v-for="item in examples" :key="item.id"
-                                                outlined v-on:click="query=item.id" >
+                                            <v-chip v-for="item in uniprotexamples" :key="item.id"
+                                                outlined v-on:click="queryUniProt=item.id" >
                                                 <b>{{ item.id }}</b> &emsp; {{ item.desc }}
                                             </v-chip>
                                         </v-chip-group>
@@ -137,7 +100,8 @@
                                         <v-radio name="goSearchType" label="Exact GO term" value="exact" dark ></v-radio>
                                     </v-radio-group>
                                 </v-tab-item> -->
-                                <!-- <v-tab-item>
+                                <!-- Fixme: Taxonomy search is currently broken -->
+                                <v-tab-item>
                                     <TaxonomyNcbiSearch
                                         :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
                                         @click:append="searchLCA"
@@ -156,18 +120,55 @@
                                         <v-radio name="lcaSearchType" label="Include lower LCA lineage" value="lower" dark></v-radio>
                                         <v-radio name="lcaSearchType" label="Exact LCA identifier" value="exact" dark ></v-radio>
                                     </v-radio-group>
-                                </v-tab-item> -->
+                                </v-tab-item>
                                 <v-tab-item>
                                     <FoldseekSearchButton @response="searchFoldseek($event)" dark></FoldseekSearchButton>
+                                </v-tab-item>
+                                                                <v-tab-item>
+                                    <v-text-field
+                                        outlined
+                                        label="Cluster ID"
+                                        style="max-width: 400px; margin: 0 auto;"
+                                        v-model="query"
+                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
+                                        :disabled="inSearch"
+                                        @click:append="searchCluster"
+                                        @keyup.enter="searchCluster"
+                                        @change="selectedExample = null"
+                                        @keydown="error = null"
+                                        :error="error != null"
+                                        :error-messages="error ? error : []"
+                                        dark
+                                        >
+                                    </v-text-field>
+                                    
+                                    <template>
+                                        <h2 class="text-h6 mb-2">
+                                            Examples
+                                        </h2>
+                                        <v-chip-group
+                                            column
+                                            dark
+                                            v-model="selectedExample"
+                                            style="max-width: 400px; margin: 0 auto; "
+                                        >
+
+                                            <v-chip v-for="item in intcluexamples" :key="item.id"
+                                                outlined v-on:click="query=item.id" >
+                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
+                                            </v-chip>
+                                        </v-chip-group>
+                                    </template>
                                 </v-tab-item>
                             </v-tabs-items>
                         </v-col>
                     </v-row>
                 </v-parallax>
             </v-flex>
-            <!-- <GoSearchResult v-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult>
+            <UniProtSearchResult v-if="tab == 0" @total="small = $event > 0; inSearch = false;"></UniProtSearchResult>
+            <GoSearchResult v-else-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult>
             <LCASearchResult v-else-if="tab == 2" @total="small = $event > 0; inSearch = false;"></LCASearchResult>
-            <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult> -->
+            <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult>
             <v-flex>
                 <v-card flat>
                     <v-flex>
@@ -177,7 +178,7 @@
                     <v-card-title primary-title class="pt-0 mt-0">
                         
                         <p class="text-subtitle-1 mb-0" style="word-break: break-word;">
-                            TODO
+                            <!-- TODO -->
                             <!-- Barrio-Hernandez&nbsp;I, Yeo&nbsp;J, Jänes&nbsp;J, Mirdita&nbsp;M, Gilchrist&nbsp;CLM, Wein&nbsp;T, Varadi&nbsp;M, Velankar&nbsp;S, Beltrao&nbsp;P, Steinegger&nbsp;M. 
                             <a href="https://nature.com/articles/s41586-023-06510-w" target="_blank" rel="noopener">Clustering predicted structures at the scale of the known protein universe.</a>
                             Nature,&nbsp;2023. -->
@@ -214,6 +215,7 @@ import FoldseekSearchButton from "./FoldseekSearchButton.vue";
 import TaxonomyNcbiSearch from "./TaxonomyNcbiSearch.vue";
 import LCASearchResult from "./LCASearchResult.vue";
 import FoldseekSearchResult from "./FoldseekSearchResult.vue";
+import UniProtSearchResult from "./UniProtSearchResult.vue";
 
 export default {
     name: "search",
@@ -229,13 +231,15 @@ export default {
     data() {
         return {
             tab: 0,
-            query: "TODO",
+            query: "172289393",
+            queryUniProt: "Q8GBB2",
             selectedExample: 1,
-            examples: [ // TODO
-                {id:'TODO', desc:'predicted \'Transporter\' protein'},
-                // {id:'B4DKH6', desc:'Bactericidal permeability-increasing protein'},
-                // {id:'A0A1G5ASE0', desc:'Histone (bacteria)'},
-                // {id:'A0A1S3QU81', desc:' Gasdermin containing domain'},
+            uniprotexamples: [ // TODO
+                {id:'Q8GBB2', desc:'tRNA (adenine(58)-N(1))-methyltransferase TrmI'},
+            ],
+            intcluexamples: [ // TODO
+                {id: '68503201', desc: 'VIRAL PROTEIN/IMMUNE SYSTEM'},
+                {id:'20404701', desc:'TRANSFERASE'},
             ],
             queryGo: { text: "TODO", value: "TODO" },
             goSearchType: "lower",
@@ -271,20 +275,26 @@ export default {
         },
         setTab() {
             if (this.$route.params.go) {
-                this.tab = 1;
+                this.tab = 10;
                 this.queryGo = { text: "" + this.$route.params.go, value: this.$route.params.go};
                 this.goSearchType = this.$route.params.type;
             } else if (this.$route.params.taxid) {
-                this.tab = 2;
+                this.tab = 1;
                 this.queryLCA = {text: "" + this.$route.params.taxid, value: this.$route.params.taxid};
                 this.lcaSearchType = this.$route.params.type;
             } else if (this.$route.params.jobid) {
-                this.tab = 3;
-            } else {
+                this.tab = 2;
+            } else if (this.$route.params.accession) {
                 this.tab = 0;
+                this.queryUniProt = this.$route.params.accession; 
+            } else {
+                this.tab = 10;
             }
         },
         search() {
+            if (!this.query) {
+                return;
+            }
             this.inSearch = true;
             this.error = null;
             this.$axios.get("/" + this.query)
@@ -302,12 +312,28 @@ export default {
                     this.inSearch = false;
                 });
         },
+        searchUniProt() {
+            if (!this.queryUniProt) {
+                return;
+            }
+
+            this.inSearch = true;
+            this.error = null;
+            this.$router.push({
+                name: "uniprot",
+                params: { accession: this.queryUniProt }
+            })
+            .catch((error) => {
+                if (error && error.name == "NavigationDuplicated") {
+                    this.inSearch = false;
+                }
+            });
+        },
         searchCluster() {
             this.inSearch = true;
             this.error = null;
             this.$axios.get("/cluster/" + this.query)
                 .then(response => {
-                    console.log(response.data);
                     this.$router.push({ name: 'cluster', params: { cluster: response.data.intclu_rep_accession } })
                 })
                 .catch((err) => {
