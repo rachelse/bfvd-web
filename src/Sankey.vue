@@ -6,7 +6,8 @@
 
 <script>
 import * as d3sankey from "d3-sankey";
-import { select, selectAll, scaleOrdinal } from "d3";
+import { select, selectAll, scaleOrdinal, interpolateHcl, range } from "d3";
+import * as Colors from './Colors.js';
 
 export default {
 	name: "Sankey",
@@ -41,31 +42,8 @@ export default {
 			"no rank",
 			"clade",
 		],
-		colors: [
-			"#57291F",
-			"#C0413B",
-			"#D77B5F",
-			"#FF9200",
-			"#FFCD73",
-			"#F7E5BF",
-			"#C87505",
-			"#F18E3F",
-			"#E59579",
-			"#C14C32",
-			"#80003A",
-			"#506432",
-			"#FFC500",
-			"#B30019",
-			"#EC410B",
-			"#E63400",
-			"#8CB5B5",
-			"#6C3400",
-			"#FFA400",
-			"#41222A",
-			"#FFB27B",
-			"#FFCD87",
-			"#BC7576",
-		],
+		startColor: Colors.purple.code,
+		endColor: Colors.skyblue.code,
 	}),
 	watch: {
 		cluster() {
@@ -290,7 +268,6 @@ export default {
 				links: links.map((d) => Object.assign({}, d)),
 			});
 
-			const color = scaleOrdinal().range(this.colors);
 			const unclassifiedLabelColor = "#696B7E";
 
 			// Manually adjust nodes position to align by rank
@@ -309,7 +286,8 @@ export default {
 				if (node.type === "unclassified") {
 					node.color = unclassifiedLabelColor;
 				} else {
-					node.color = color(node.id); // Assign color to node
+					const rankIndex = this.sankeyRankOrder.indexOf(node.rank);
+					node.color = this.rankPalette[rankIndex] || "#696B7E";
 				}
 			});
 
@@ -383,7 +361,7 @@ export default {
 				.enter()
 				.append("path")
 				.attr("d", d3sankey.sankeyLinkHorizontal())
-				.attr("stroke", (d) => (d.target.type === "unclassified" ? unclassifiedLabelColor : color(d.source.color))) // Set link color to source node color with reduced opacity
+				.attr("stroke", (d) => d.source.color)
 				.attr("stroke-width", (d) => Math.max(1, d.width));
 			// .attr("clip-path", (d, i) => `url(#clip-path-${this.instanceId}-${i})`);
 
@@ -482,6 +460,13 @@ export default {
 			// this.highlightNodes(this.searchQuery);
 		},
 	},
+	computed : {
+		rankPalette() {
+			const interpolator = interpolateHcl(this.startColor, this.endColor);
+			const steps = this.sankeyRankOrder.length;
+			return range(steps).map(i => interpolator(i / (steps - 1)));
+    	}
+	}
 };
 </script>
 

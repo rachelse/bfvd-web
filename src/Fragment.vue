@@ -6,6 +6,8 @@
 </template>
 
 <script>
+import { colors } from 'vuetify/lib';
+import * as Colors from './Colors.js';
 
 export default {
     name: "Fragment",
@@ -22,11 +24,11 @@ export default {
         },
         flagColor() {
             if (this.flag == 1) {
-                return "#9ED19F";
+                return Colors.lightgreen.code;
             } else if (this.flag == 2) {
-                return "#7f2a61";
+                return Colors.purple.code;
             } else if (this.flag == 3) {
-                return "#88d3e5";
+                return Colors.skyblue.code;
             }
         }
     }
