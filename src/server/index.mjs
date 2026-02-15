@@ -159,21 +159,33 @@ function finalizeResult(result, req, res) {
 }
 
 app.get('/api/search/uniprot', async (req, res) => {
+    let filter_params = [];
+    if (req.query.n_mem_range) {
+        const split = req.query.n_mem_range.split(',');
+        filter_params.push(split[0] ?? '0');
+        filter_params.push(split[1] ?? 'INF');
+    } else {
+        filter_params.push('0');
+        filter_params.push('INF');
+    }
+
+    let queries_where = [];
+    queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
+    
     const accession = req.query.query_UniProt;
     let result = await sql.all(`
-  WITH reps AS (
-    SELECT DISTINCT m.intclu_rep_accession AS rep
-    FROM member AS m
-    WHERE (m.uniprot_id1 = ? OR m.uniprot_id2 = ?)
-      AND m.intclu_rep_accession IS NOT NULL
-  )
-  SELECT m.*, c.*
-  FROM reps
-  JOIN cluster c ON c.intclu_rep_accession = reps.rep
-  JOIN member  m ON m.intclu_rep_accession = reps.rep
-  WHERE m.accession == m.intclu_rep_accession
-            
-        `, accession, accession);
+    WITH reps AS (
+        SELECT DISTINCT m.intclu_rep_accession AS rep
+        FROM member AS m
+        WHERE (m.uniprot_id1 = ? OR m.uniprot_id2 = ?)
+        AND m.intclu_rep_accession IS NOT NULL
+    )
+    SELECT m.*, c.*
+    FROM reps
+    JOIN cluster c ON c.intclu_rep_accession = reps.rep
+    JOIN member  m ON m.intclu_rep_accession = reps.rep
+    WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
+    `, accession, accession, ...filter_params);
     result.forEach((x) => {
         if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
             x.uniprot_id1 = null;
@@ -203,8 +215,8 @@ app.get('/api/search/pdb', async (req, res) => {
         FROM reps
         JOIN cluster c ON c.intclu_rep_accession = reps.rep
         JOIN member  m ON m.intclu_rep_accession = reps.rep
-        WHERE m.accession == m.intclu_rep_accession
-        `, entry);
+        WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
+        `, entry, ...filter_params);
     result.forEach((x) => {
         if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
             x.uniprot_id1 = null;
@@ -409,7 +421,7 @@ app.get('/api/search/foldseek/{:taxonomy}', async (req, res) => {
 
 app.get('/api/:query', async (req, res) => {
     let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.uniprot_id1 = ? OR m.uniprot_id2 = ?", req.params.query, req.params.query);
-    if (!result || result.lca_tax_id == null) {
+    if (!result) {
         res.status(404).send({ error: "No cluster found" });
         return;
     }
@@ -419,7 +431,7 @@ app.get('/api/:query', async (req, res) => {
 
 app.get('/api/pdbid/:pdbid', async (req, res) => {
     let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.pdb_id = ?", req.params.pdbid);
-    if (!result || result.lca_tax_id == null) {
+    if (!result) {
         res.status(404).send({ error: "No cluster found" });
         return;
     }
@@ -631,12 +643,22 @@ app.get('/api/cluster/:cluster', async (req, res) => {
         res.status(404).send({ error: "No cluster found" });
         return;
     }
-    result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
-    result.lineage = tree.nodeExists(result.lca_tax_id.id) ? tree.lineage(result.lca_tax_id) : null;
+    if (result.lca_tax_id) {
+        result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
+        result.lineage = tree.nodeExists(result.lca_tax_id.id) ? tree.lineage(result.lca_tax_id) : null;
+    }
+
     result.tax_id1 = tree.nodeExists(result.tax_id1) ? tree.getNode(result.tax_id1) : null;
     result.tax_id2 = tree.nodeExists(result.tax_id2) ? tree.getNode(result.tax_id2) : null;
-    result.rep_lineage1 = tree.nodeExists(result.tax_id1.id) ? tree.lineage(result.tax_id1) : null;
-    result.rep_lineage2 = tree.nodeExists(result.tax_id2.id) ? tree.lineage(result.tax_id2) : null;
+
+    if (result.tax_id1) {
+        result.rep_lineage1 = tree.nodeExists(result.tax_id1.id) ? tree.lineage(result.tax_id1) : null;
+    }
+
+    if (result.tax_id2) {
+        result.rep_lineage2 = tree.nodeExists(result.tax_id2.id) ? tree.lineage(result.tax_id2) : null;
+    }
+
     result.description = getDescription(result.intclu_rep_accession);
     if ( result.uniprot_id1 == "nan" || result.uniprot_id1 == "" ) {
         result.uniprot_id1 = null;

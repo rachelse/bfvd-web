@@ -48,6 +48,6 @@ export const black = {
 }
 
 export const dark = {
-    'code': '#eeeeee',
-    'hex': '0xeeeeee'
+    'code': '#2e2e2e',
+    'hex': '0x2e2e2e'
 }
