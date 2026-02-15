@@ -7,6 +7,8 @@
  * Copyright: Rachel Seongeun Kim
  */
 import * as d3 from 'd3';
+import * as Colors from './Colors.js';
+import { colors } from 'vuetify/lib/index.js';
 
 export function drawStackedBar(svgEl, data, {
     isFraction = true,          // true if values are 0..1
@@ -43,7 +45,7 @@ export function drawStackedBar(svgEl, data, {
     const innerW = Math.max(1, width - leftPad - rightPad);
     const y = topPad;
 
-    const palette4 = d3.range(4).map(i => d3.interpolateHcl('#7f2a61', '#0a0936')(i / 3));
+    const palette4 = d3.range(4).map(i => d3.interpolateHcl(Colors.purple.code, Colors.darkblue.code)(i / 3));
 
     const color = d3.scaleOrdinal()
         .domain(clean.map(d => d.label))
@@ -65,11 +67,11 @@ export function drawStackedBar(svgEl, data, {
 
     const tooltipBg = tooltip.append('rect')
         .attr('rx', 6).attr('ry', 6)
-        .attr('fill', '#fff')
+        .attr('fill', Colors.white.code)
         .attr('fill-opacity', 0.8);
 
     const tooltipText = tooltip.append('text')
-        .style('fill', '#000')
+        .style('fill', Colors.black.code)
         .style('font-size', '12px');
 
     function setTooltip(event, text) {
@@ -138,7 +140,7 @@ export function drawStackedBar(svgEl, data, {
         .style('font-weight', '500')
         .style('font-size', '10px')
         .style('pointer-events', 'none')
-        .style('fill', '#fff')
+        .style('fill', Colors.white.code)
         .text(d => `${d.label} ${Math.round(d.frac * 100)}%`);
 
     // If you want to hide labels during hover (like your pie):
@@ -201,11 +203,11 @@ export function drawPie(svgEl, data) {
 
     const tooltipBg = tooltip.append('rect')
         .attr('rx', 6).attr('ry', 6)
-        .attr('fill', '#fff')
+        .attr('fill', Colors.white.code)
         .attr('fill-opacity', 0.75);
 
     const tooltipText = tooltip.append('text')
-        .attr('fill', '#000')
+        .attr('fill', Colors.black.code)
         .style('font-size', '12px');
 
     function setTooltipPosition(event) {
@@ -223,7 +225,7 @@ export function drawPie(svgEl, data) {
         .append('path')
         .attr('d', arc)
         .attr('fill', d => color(d.data.label))
-        .attr('stroke', '#fff')
+        .attr('stroke', Colors.white.code)
         .attr('stroke-width', 1)
         .style('cursor', 'pointer');
 
@@ -299,5 +301,49 @@ export function drawPie(svgEl, data) {
         .on('mouseenter', showTooltip)
         .on('mousemove', moveTooltip)
         .on('mouseleave', hideTooltip);
-
 };
+
+export function setChainName(structure, chainName) {
+    const lines = structure.split('\n');
+    let chainname = chainName;
+    if (chainName.length > 1) {
+        chainname = chainName.slice(0,1); // PDB format limitation
+    }
+    const newLines = lines.map(line => {
+        if (line.startsWith('ATOM') || line.startsWith('HETATM')) {
+            return line.slice(0, 21) + chainname + line.slice(22);
+        }
+        return line;
+    });
+    return newLines.join('\n');
+}
+
+
+const oneToThree = {
+  "A":"ALA", "R":"ARG", "N":"ASN", "D":"ASP",
+  "C":"CYS", "E":"GLU", "Q":"GLN", "G":"GLY",
+  "H":"HIS", "I":"ILE", "L":"LEU", "K":"LYS",
+  "M":"MET", "F":"PHE", "P":"PRO", "S":"SER",
+  "T":"THR", "W":"TRP", "Y":"TYR", "V":"VAL",
+  "U":"SEC", "O":"PHL", "X":"XAA"
+};
+
+export function mockPDB(ca, seq) {
+    const chainLength = ca.length / 3;
+    const pdb = [];
+    let j = 0;
+
+    for (let i = 0; i < ca.length; i+=3, j++) {
+        const line = 'ATOM  '
+            + j.toString().padStart(5)
+            + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == seq.length ? seq[i/3] : 'A'] + ' A'
+            + j.toString().padStart(4)
+            + '    '
+            + ca[0 * chainLength + j].toString().padStart(8)
+            + ca[1 * chainLength + j].toString().padStart(8)
+            + ca[2 * chainLength + j].toString().padStart(8)
+            + '  1.00  0.00           C  ';
+        pdb.push(line);
+    }
+    return pdb.join('\n');
+}

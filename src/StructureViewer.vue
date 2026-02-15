@@ -87,7 +87,7 @@
         <template v-if="second">
             <span v-if="secondComponent == null">Superposition loading</span>
             <template v-else>
-                <span style="color:#FFC107">{{ second }}</span> superposed on representative <span style="color:#1E88E5">{{ cluster }}</span>
+                <span :style="{ color: colors.yellow_fs.code }">{{ second }}</span> superposed on representative <span :style="{ color: colors.blue_fs.code }">{{ cluster }}</span>
                 <template v-if="tmOutput">
                     <br>
                     <span><strong>TM-score:</strong>&nbsp; {{ tmOutput.tmScore.toFixed(2) }}</span>&nbsp;
@@ -117,6 +117,8 @@ import { isProtein, MoleculeType } from 'molstar/lib/mol-model/structure/model/t
 
 import Panel from './Panel.vue';
 import { pulchra } from 'pulchra-wasm';
+import { setChainName, mockPDB } from './Utils.js';
+import * as Colors from './Colors.js';
 import { transform } from '@vue/compiler-dom';
 import { CifWriter } from 'molstar/lib/mol-io/writer/cif';
 
@@ -130,29 +132,6 @@ const tmalign = function(pdb1, pdb2) {
     });
 };
 
-const oneToThree = {
-  "A":"ALA", "R":"ARG", "N":"ASN", "D":"ASP",
-  "C":"CYS", "E":"GLU", "Q":"GLN", "G":"GLY",
-  "H":"HIS", "I":"ILE", "L":"LEU", "K":"LYS",
-  "M":"MET", "F":"PHE", "P":"PRO", "S":"SER",
-  "T":"THR", "W":"TRP", "Y":"TYR", "V":"VAL",
-  "U":"SEC", "O":"PHL", "X":"XAA"
-};
-
-function setChainName(structure, chainName) {
-    const lines = structure.split('\n');
-    let chainname = chainName;
-    if (chainName.length > 1) {
-        chainname = chainName.slice(0,1); // PDB format limitation
-    }
-    const newLines = lines.map(line => {
-        if (line.startsWith('ATOM') || line.startsWith('HETATM')) {
-            return line.slice(0, 21) + chainname + line.slice(22);
-        }
-        return line;
-    });
-    return newLines.join('\n');
-}
 function chainSelection(auth_asym_id) {
     return MS.struct.generator.atomGroups({
         'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), auth_asym_id])
@@ -254,30 +233,8 @@ async function getInterfaceResidues(structure, chain1, chain2, thresholdSq = 8.0
             }
         }
     }
-  
-    // await addChainRepresentation(this.plugin, struct1.structure, chain1, "JO", 0xFF0000);
     
     return { interfaceResidues1, interfaceResidues2 };
-}
-
-function mockPDB(ca, seq, chain = 'A') {
-    const chainLength = ca.length / 3;
-    const pdb = [];
-    let j = 0;
-
-    for (let i = 0; i < ca.length; i+=3, j++) {
-        const line = 'ATOM  '
-            + j.toString().padStart(5)
-            + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == seq.length ? seq[i/3] : 'A'] + ' ' + chain
-            + j.toString().padStart(4)
-            + '    '
-            + ca[0 * chainLength + j].toString().padStart(8)
-            + ca[1 * chainLength + j].toString().padStart(8)
-            + ca[2 * chainLength + j].toString().padStart(8)
-            + '  1.00  0.00           C  ';
-        pdb.push(line);
-    }
-    return pdb.join('\n');
 }
 
 export default {
@@ -290,6 +247,7 @@ export default {
         interfaceMap: null,
         'isFullscreen': false,
         'hovered': false,
+        colors: Colors
     }),
     props: {
         'cluster': { type: String, required: true },
@@ -297,8 +255,8 @@ export default {
         // 'chain1': { type: String, required: true },
         // 'chain2': { type: String, required: true },
         'toolbar': { type: Boolean, default: true },
-        'bgColorLight': { type: String, default: "0xffffff" },
-        'bgColorDark': { type: String, default: "0xeeeeee" },
+        'bgColorLight': { type: String, default: Colors.white.hex},
+        'bgColorDark': { type: String, default: Colors.dark.hex },
     },
     methods: {
         async initMolstar() {
@@ -434,7 +392,7 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
 
         async fetchStructure(accession) {
             const response = await this.$axios.get("/structure/" + accession);
-            const pdb = await pulchra(mockPDB(response.data.coordinates, response.data.seq, 'A'));
+            const pdb = await pulchra(mockPDB(response.data.coordinates, response.data.seq));
             const structure = await this.loadPdbStructure(pdb);
             return structure
         },
@@ -446,9 +404,9 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
             ]);
             let pdb1 = await pulchra(mockPDB(r1.data.coordinates, r1.data.seq));
             let pdb2 = await pulchra(mockPDB(r2.data.coordinates, r2.data.seq));
-            // TODO: How can we set chain names if they are long?
-            pdb1 = setChainName(pdb1, 'A'); // chain1
-            pdb2 = setChainName(pdb2, 'B'); // chain2
+            // TODO: How can we set chain names if they are long? 
+            pdb1 = setChainName(pdb1, 'A'); // Chain Names are gone after running pulchra
+            pdb2 = setChainName(pdb2, 'B'); 
             const combined = pdb1.split('END')[0] + '\n' + pdb2.split('END')[0];
 
             const structure = await this.loadPdbStructure(combined);
@@ -520,8 +478,8 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
         if (!response || !response.data) return;
 
         const structure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2);
-        await addChainRepresentation(this.plugin, structure, 'A', "Chain 1", 0x7f2a61);
-        await addChainRepresentation(this.plugin, structure, 'B', "Chain 2", 0x88d3e5);
+        await addChainRepresentation(this.plugin, structure, 'A', "Chain 1", Colors.purple.hex);
+        await addChainRepresentation(this.plugin, structure, 'B', "Chain 2", Colors.skyblue.hex);
         // this.component = await this.plugin.builders.structure.hierarchy.applyPreset(structure, "default");
         this.resetView();
         // const interfaceMap = getInterfaceResidues(structure, response.data.chain1, response.data.chain2);
