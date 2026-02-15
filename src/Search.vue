@@ -34,6 +34,7 @@
                                 dark
                             >
                                 <v-tab>UniProt</v-tab>
+                                <v-tab>PDB</v-tab>
                                 <!-- <v-tab>Gene Ontology</v-tab> -->
                                 <v-tab>Taxonomy</v-tab>
                                 <v-tab>Structure</v-tab>
@@ -71,6 +72,42 @@
 
                                             <v-chip v-for="item in uniprotexamples" :key="item.id"
                                                 outlined v-on:click="queryUniProt=item.id" >
+                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
+                                            </v-chip>
+                                        </v-chip-group>
+                                    </template>
+                                </v-tab-item>
+                                <v-tab-item>
+                                   <v-text-field
+                                        outlined
+                                        label="PDB ID"
+                                        style="max-width: 400px; margin: 0 auto;"
+                                        v-model="queryPDB"
+                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
+                                        :disabled="inSearch"
+                                        @click:append="searchPDB"
+                                        @keyup.enter="searchPDB"
+                                        @change="selectedExample = null"
+                                        @keydown="error = null"
+                                        :error="error != null"
+                                        :error-messages="error ? error : []"
+                                        dark
+                                        >
+                                    </v-text-field>
+                                    
+                                    <template>
+                                        <h2 class="text-h6 mb-2">
+                                            Examples
+                                        </h2>
+                                        <v-chip-group
+                                            column
+                                            dark
+                                            v-model="selectedExample"
+                                            style="max-width: 600px; margin: 0 auto; "
+                                        >
+
+                                            <v-chip v-for="item in pdbexamples" :key="item.id"
+                                                outlined v-on:click="queryPDB=item.id" >
                                                 <b>{{ item.id }}</b> &emsp; {{ item.desc }}
                                             </v-chip>
                                         </v-chip-group>
@@ -124,7 +161,7 @@
                                 <v-tab-item>
                                     <FoldseekSearchButton @response="searchFoldseek($event)" dark></FoldseekSearchButton>
                                 </v-tab-item>
-                                                                <v-tab-item>
+                                <v-tab-item>
                                     <v-text-field
                                         outlined
                                         label="Cluster ID"
@@ -166,7 +203,8 @@
                 </v-parallax>
             </v-flex>
             <UniProtSearchResult v-if="tab == 0" @total="small = $event > 0; inSearch = false;"></UniProtSearchResult>
-            <GoSearchResult v-else-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult>
+            <PDBSearchResult v-else-if="tab == 1" @total="small = $event > 0; inSearch = false;"></PDBSearchResult>
+            <!-- <GoSearchResult v-else-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult> -->
             <LCASearchResult v-else-if="tab == 2" @total="small = $event > 0; inSearch = false;"></LCASearchResult>
             <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult>
             <v-flex>
@@ -216,6 +254,7 @@ import TaxonomyNcbiSearch from "./TaxonomyNcbiSearch.vue";
 import LCASearchResult from "./LCASearchResult.vue";
 import FoldseekSearchResult from "./FoldseekSearchResult.vue";
 import UniProtSearchResult from "./UniProtSearchResult.vue";
+import PDBSearchResult from "./PDBSearchResult.vue";
 
 export default {
     name: "search",
@@ -227,15 +266,21 @@ export default {
         LCASearchResult,
         FoldseekSearchButton,
         FoldseekSearchResult,
+        UniProtSearchResult,
+        PDBSearchResult
     },
     data() {
         return {
             tab: 0,
             query: "172289393",
             queryUniProt: "Q8GBB2",
+            queryPDB: "6LHT",
             selectedExample: 1,
             uniprotexamples: [ // TODO
                 {id:'Q8GBB2', desc:'tRNA (adenine(58)-N(1))-methyltransferase TrmI'},
+            ],
+            pdbexamples: [ // TODO
+                {id:'6LHT', desc:'TODO'},
             ],
             intcluexamples: [ // TODO
                 {id: '68503201', desc: 'VIRAL PROTEIN/IMMUNE SYSTEM'},
@@ -278,15 +323,18 @@ export default {
                 this.tab = 10;
                 this.queryGo = { text: "" + this.$route.params.go, value: this.$route.params.go};
                 this.goSearchType = this.$route.params.type;
-            } else if (this.$route.params.taxid) {
-                this.tab = 1;
-                this.queryLCA = {text: "" + this.$route.params.taxid, value: this.$route.params.taxid};
-                this.lcaSearchType = this.$route.params.type;
-            } else if (this.$route.params.jobid) {
-                this.tab = 2;
             } else if (this.$route.params.accession) {
                 this.tab = 0;
                 this.queryUniProt = this.$route.params.accession; 
+            } else if (this.$route.params.entry) {
+                this.tab = 1;
+                this.queryPDB = this.$route.params.entry.toLowerCase();
+            } else if (this.$route.params.taxid) {
+                this.tab = 2;
+                this.queryLCA = {text: "" + this.$route.params.taxid, value: this.$route.params.taxid};
+                this.lcaSearchType = this.$route.params.type;
+            } else if (this.$route.params.jobid) {
+                this.tab = 3;
             } else {
                 this.tab = 10;
             }
@@ -313,21 +361,63 @@ export default {
                 });
         },
         searchUniProt() {
-            if (!this.queryUniProt) {
-                return;
-            }
+            const accession = (this.queryUniProt || "").trim().toUpperCase();
+            if (!accession) return;
 
             this.inSearch = true;
             this.error = null;
-            this.$router.push({
-                name: "uniprot",
-                params: { accession: this.queryUniProt }
-            })
-            .catch((error) => {
-                if (error && error.name == "NavigationDuplicated") {
+
+            this.$axios
+                .get("/" + encodeURIComponent(accession))
+                .then((res) => {
+                    return this.$router.push({
+                        name: "uniprot",
+                        params: { accession }
+                    });
+                })
+                .catch((err) => {
+                    if (err && err.name === "NavigationDuplicated") {
+                        this.inSearch = false;
+                        return;
+                    }
+                    if (err.response && err.response.data && err.response.data.error) {
+                        this.error = err.response.data.error;
+                    } else {
+                        this.error = "Unknown error";
+                    }
+
                     this.inSearch = false;
-                }
-            });
+                });
+        },
+
+        searchPDB() {
+            const entry = (this.queryPDB || "").trim().toLowerCase();
+            if (!entry) return;
+
+            this.inSearch = true;
+            this.error = null;
+
+            this.$axios
+                .get("/pdbid/" + encodeURIComponent(entry))
+                .then((res) => {
+                    return this.$router.push({
+                        name: "pdb",
+                        params: { entry }
+                    });
+                })
+                .catch((err) => {
+                    if (err && err.name === "NavigationDuplicated") {
+                        this.inSearch = false;
+                        return;
+                    }
+                    if (err.response && err.response.data && err.response.data.error) {
+                        this.error = err.response.data.error;
+                    } else {
+                        this.error = "Unknown error";
+                    }
+
+                    this.inSearch = false;
+                });
         },
         searchCluster() {
             this.inSearch = true;

@@ -182,6 +182,37 @@ app.get('/api/search/uniprot', async (req, res) => {
             x.uniprot_id2 = null;
         }
     });
+
+    if (!result || result.length == 0) {
+        res.status(404).send({ error: "No cluster found" });
+        return;
+    }
+    return finalizeResult(result, req, res);
+});
+
+app.get('/api/search/pdb', async (req, res) => {
+    const entry = req.query.query_PDB;
+    let result = await sql.all(`
+        WITH reps AS (
+            SELECT DISTINCT m.intclu_rep_accession AS rep
+            FROM member AS m
+            WHERE (m.pdb_id = ?)
+            AND m.intclu_rep_accession IS NOT NULL
+        )
+        SELECT m.*, c.*
+        FROM reps
+        JOIN cluster c ON c.intclu_rep_accession = reps.rep
+        JOIN member  m ON m.intclu_rep_accession = reps.rep
+        WHERE m.accession == m.intclu_rep_accession
+        `, entry);
+    result.forEach((x) => {
+        if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
+            x.uniprot_id1 = null;
+        }
+        if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
+            x.uniprot_id2 = null;
+        }
+    });
     return finalizeResult(result, req, res);
 });
 
@@ -378,6 +409,16 @@ app.get('/api/search/foldseek/{:taxonomy}', async (req, res) => {
 
 app.get('/api/:query', async (req, res) => {
     let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.uniprot_id1 = ? OR m.uniprot_id2 = ?", req.params.query, req.params.query);
+    if (!result || result.lca_tax_id == null) {
+        res.status(404).send({ error: "No cluster found" });
+        return;
+    }
+    result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
+    res.send([ result ]);
+});
+
+app.get('/api/pdbid/:pdbid', async (req, res) => {
+    let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.pdb_id = ?", req.params.pdbid);
     if (!result || result.lca_tax_id == null) {
         res.status(404).send({ error: "No cluster found" });
         return;
