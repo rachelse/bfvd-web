@@ -1,35 +1,76 @@
 import { PluginContext } from 'molstar/lib/mol-plugin/context.js';
 import { DefaultPluginSpec } from 'molstar/lib/mol-plugin/spec.js';
+import { PluginCommands } from 'molstar/lib/mol-plugin/commands.js';
 import { RawData } from 'molstar/lib/mol-plugin-state/transforms/data.js';
-import { ModelFromTrajectory, StructureFromModel, TrajectoryFromPDB } from 'molstar/lib/mol-plugin-state/transforms/model.js';
+import { ModelFromTrajectory, StructureFromModel, TrajectoryFromPDB, StructureSelectionFromExpression } from 'molstar/lib/mol-plugin-state/transforms/model.js';
 import { StructureRepresentation3D } from 'molstar/lib/mol-plugin-state/transforms/representation.js';
+import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder.js';
+import { canvasToBlob } from 'molstar/lib/mol-canvas3d/util.js';
 import { pulchra } from 'pulchra-wasm';
 import { setChainName, mockPDB } from './Utils.js';
+import * as Colors from './Colors.js';
 
 export class MolstarService {
     constructor() {
-        // We create a hidden container for the plugin to render into
-        this.container = document.createElement('div');
-        this.container.style.display = 'none'; 
-        document.body.appendChild(this.container);
-
-        this.plugin = null;
+        const div = document.createElement('div');
+        div.style.width = '100px';
+        div.style.height = '100px';
+        div.style.position = 'absolute';
+        div.style.top = '0';
+        div.style.left = '-1000px';
+        div.style.zIndex = '-999';
+        div.ariaHidden = true;
+    
+        this.container = div;
+        document.querySelector("body").appendChild(div);
+        
+        this.plugin = new PluginContext(DefaultPluginSpec());
         this.promise = Promise.resolve();
-        this._init();
+        this.ready = this._init();
     }
 
     async _init() {        
-        // Use the standard PluginContext for browsers
-        const spec = DefaultPluginSpec();
-        this.plugin = new PluginContext(spec);
         await this.plugin.init();
+        await this.plugin.mountAsync(this.container);
+        await this.plugin.canvas3dInitialized;
+        this.plugin.canvas3d?.setProps({ 
+            cameraResetDurationMs: 0,  
+            renderer: {
+                ...this.plugin.canvas3d.props.renderer,
+            }
+        });
+        const renderer = this.plugin.canvas3d?.props?.renderer;
+        
         // Bind the plugin to our hidden container
-        // await this.plugin.initViewer(this.container);
+        if (renderer) {
+
+            await PluginCommands.Canvas3D.SetSettings(this.plugin, {
+                settings: {
+                renderer: {
+                    ...renderer,
+                    ambientIntensity: 0.2,
+                    backgroundAlpha: 0,
+                },
+                },
+            });
+        }
+    }
+
+    async makeImage(seq1, coordinates1, seq2, coordinates2) {
+        return new Promise((resolve) => {
+            this.promise = this.promise.then(async () => {
+                const img = await this._makeImage(seq1, coordinates1, seq2, coordinates2);
+                resolve(img);
+                return img;
+            });
+        });
     }
 
     async _makeImage(seq1, coordinates1, seq2, coordinates2) {
-        let pdb1 = mockPDB(coordinates1, seq1);
-        let pdb2 = mockPDB(coordinates2, seq2);
+        await this.ready;
+        let pdb1 = await pulchra(mockPDB(coordinates1, seq1));
+        let pdb2 = await pulchra(mockPDB(coordinates2, seq2));
+        
         pdb1 = setChainName(pdb1, 'A'); // TODO: Change to set proper chain name
         pdb2 = setChainName(pdb2, 'B');
         const fullPDB = pdb1 + '\n' + pdb2;
@@ -38,27 +79,48 @@ export class MolstarService {
         await this.plugin.clear();
 
         const update = this.plugin.build();
-        await update.toRoot()
+        const root = await update.toRoot()
             .apply(RawData, { data: fullPDB })
             .apply(TrajectoryFromPDB)
             .apply(ModelFromTrajectory)
-            .apply(StructureFromModel)
-            .apply(StructureRepresentation3D, {})
+            .apply(StructureFromModel);
+        
+        await root
+            .apply(StructureSelectionFromExpression, {
+                expression: MS.struct.generator.atomGroups({
+                'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), 'A']),
+                }),
+            })
+            .apply(StructureRepresentation3D, {
+                type: { name: 'cartoon', params: {} },
+                colorTheme: { name: 'uniform', params: { value: Colors.purple.hex } },
+            });
+        
+        await root
+            .apply(StructureSelectionFromExpression, {
+                expression: MS.struct.generator.atomGroups({
+                'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), 'B']),
+                }),
+            })
+            .apply(StructureRepresentation3D, {
+                type: { name: 'cartoon', params: {} },
+                colorTheme: { name: 'uniform', params: { value: Colors.skyblue.hex } },
+            })
             .commit();
 
-        this.plugin.managers.camera.reset();
-
-        // 3. Generate the actual Image
-        const renderer = this.plugin.canvas3d?.getScreenshot();
-        if (!renderer) throw new Error("Canvas not ready");
-        
-        // Get the image as a Blob
-        return new Promise(resolve => {
-            renderer.toBlob((blob) => resolve(blob), 'image/png');
+        this.plugin.managers.camera.reset(undefined, 0);
+        this.plugin.canvas3d?.commit(true);
+        const ss = this.plugin.helpers.viewportScreenshot;
+        ss.behaviors.values.next({
+            ...ss.values,
+            transparent: true,
         });
+        const p = await ss.getPreview(); 
+        return canvasToBlob(p.canvas, 'png');
     }
 
     dispose() {
         if (this.plugin) this.plugin.dispose();
+        if (this.container) this.container.remove();
     }
 }

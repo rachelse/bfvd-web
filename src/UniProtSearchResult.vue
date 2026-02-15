@@ -18,8 +18,7 @@
             <template v-slot:item.structure="prop">
                 <div style="text-align: left;">
                     <router-link :to="{ name: 'cluster', params: { cluster: prop.item.intclu_rep_accession }}" > <!-- target='_blank' -->
-                        {{ prop.item.intclu_rep_accession }}
-                        <!-- <img :src="getImage(prop.item.intclu_rep_accession)" style="height:75px"/> -->
+                        <img :src="getImage(prop.item.intclu_rep_accession)" style="height:75px"/>
                     </router-link>
                 </div>
             </template>
@@ -100,7 +99,7 @@ export default {
         RangeSlider,
         ExternalLinks
     },
-    // mixins: [ImageMixin],
+    mixins: [ImageMixin],
     data() {
         return {
             response: [],
@@ -108,8 +107,7 @@ export default {
             page: null,
             headers: [
                 {
-                    // text: "Structure",
-                    text: "Cluster Rep.",
+                    text: "Structure",
                     value: "structure",
                     sortable: false,
                     width: "10%",
@@ -204,7 +202,7 @@ export default {
                 .then(response => {
                     this.response = response.data.result;
                     this.total = response.data.total;
-                    // this.fetchImages(this.response.map(m => m.intclu_rep_accession));
+                    this.fetchImages(this.response.map(m => m.intclu_rep_accession));
                     this.$emit('total', this.total);
                 })
                 .finally(() => {

@@ -203,6 +203,19 @@ app.get('/api/search/uniprot', async (req, res) => {
 });
 
 app.get('/api/search/pdb', async (req, res) => {
+    let filter_params = [];
+    if (req.query.n_mem_range) {
+        const split = req.query.n_mem_range.split(',');
+        filter_params.push(split[0] ?? '0');
+        filter_params.push(split[1] ?? 'INF');
+    } else {
+        filter_params.push('0');
+        filter_params.push('INF');
+    }
+
+    let queries_where = [];
+    queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
+
     const entry = req.query.query_PDB;
     let result = await sql.all(`
         WITH reps AS (

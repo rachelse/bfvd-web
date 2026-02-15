@@ -255,13 +255,12 @@ export default {
         // 'chain1': { type: String, required: true },
         // 'chain2': { type: String, required: true },
         'toolbar': { type: Boolean, default: true },
-        'bgColorLight': { type: String, default: Colors.white.hex},
-        'bgColorDark': { type: String, default: Colors.dark.hex },
+        'bgColorLight': { type: String, default: Colors.white.hex },
+        'bgColorDark': { type: String, default: Colors.black.hex },
     },
     methods: {
         async initMolstar() {
             const bgColor = this.$vuetify.theme.dark ? this.bgColorDark : this.bgColorLight;
-            const colorNum = Color(bgColor);
             const spec = {
                 ...DefaultPluginUISpec(),
                 layout: {
@@ -272,8 +271,8 @@ export default {
                 },
                 canvas3d: {
                     renderer: {
-                        // transparentBackground: true
-                        backgroundColor: colorNum 
+                        transparentBackground: true,
+                        backgroundColor: bgColor 
                     },
                 }
             };
@@ -501,7 +500,7 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
 .structure-wrapper {
     margin: 0 auto;
     position: relative;
-    height: 300px;
+    height: 360px;
     width: 100%;
 }
 
