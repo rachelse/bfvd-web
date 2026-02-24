@@ -127,8 +127,10 @@
                 </TaxonomyAutocomplete>
         </template>
         <template v-slot:item.tax_id="prop">
-            <div><TaxSpan :taxonomy="prop.item.tax_id1"></TaxSpan></div>
-            <div><TaxSpan :taxonomy="prop.item.tax_id2"></TaxSpan></div>
+            <div v-if="prop.item.tax_id1 && prop.item.tax_id1.name"><TaxSpan :taxonomy="prop.item.tax_id1"></TaxSpan></div>
+            <div v-else>N/A</div>
+            <div v-if="prop.item.tax_id2 && prop.item.tax_id2.name"><TaxSpan :taxonomy="prop.item.tax_id2"></TaxSpan></div>
+            <div v-else>N/A</div>
         </template>
 
         <template v-slot:item.actions="{ item }">
@@ -191,11 +193,6 @@ export default {
                     sortable: false,
                     width: "20%",
                 },
-                // {
-                //     text: "Length",
-                //     value: "len",
-                //     sortable: false,
-                // },
                 {
                     text: "Taxonomy",
                     value: "tax_id",
@@ -274,7 +271,7 @@ export default {
                 .then(response => {
                     this.members = response.data.result;
                     this.totalMembers = response.data.total;
-                    this.fetchImages(this.members.map(m => m.accession)); // TODO change
+                    this.fetchImages(this.members.map(m => m.accession));
                 })
                 .catch(() => {})
                 .finally(() => {

@@ -131,7 +131,7 @@ function finalizeResult(result, req, res) {
             }
             let currNode = tree.getNode(x.lca_tax_id.id);
             while (currNode.id != 1) {
-                if (currNode.id == req.query.tax_id1) {
+                if (currNode.id == req.query.tax_id) {
                     return true;
                 }
                 currNode = tree.getNode(currNode.parent);
@@ -158,7 +158,7 @@ function finalizeResult(result, req, res) {
     return;
 }
 
-app.get('/api/search/uniprot', async (req, res) => {
+app.get('/api/search/uniprot{/:taxonomy}', async (req, res) => {
     let filter_params = [];
     if (req.query.n_mem_range) {
         const split = req.query.n_mem_range.split(',');
@@ -202,7 +202,9 @@ app.get('/api/search/uniprot', async (req, res) => {
     return finalizeResult(result, req, res);
 });
 
-app.get('/api/search/pdb', async (req, res) => {
+app.get('/api/search/pdb{/:taxonomy}', async (req, res) => {
+    
+    
     let filter_params = [];
     if (req.query.n_mem_range) {
         const split = req.query.n_mem_range.split(',');
@@ -348,9 +350,8 @@ app.get('/api/search/lca/{:taxonomy}', async (req, res) => {
     return finalizeResult(result, req, res);
 });
 
-app.get('/api/search/foldseek/{:taxonomy}', async (req, res) => {
+app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
     const jobid = encodeURIComponent(req.query.jobid);
-
     let results = [];
     if (fileCache.contains(jobid)) {
         results = JSON.parse(fileCache.get(jobid));

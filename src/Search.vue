@@ -5,7 +5,6 @@
                 <v-parallax
                     :height="windowHeight"
                     :src="require('./assets/bg-tmp3.png')"
-                    dark
                 >
                     <v-row
                         align="center"
@@ -534,6 +533,13 @@ code {
 
 .v-parallax {
     transition: height 0.25s;
+}
+
+.hero ::v-deep .v-parallax__image {
+  width: 100% !important;
+  /* height: 100% !important; */
+  object-fit: contain !important;
+  object-position: right top;
 }
 
 .marv-bg-fg {

@@ -47,8 +47,6 @@
                 </div>
             </template>
 
-
-            /*FIXME: this is currently not working*/
             <template v-slot:header.lca_tax_id="{ header }"> 
                 <TaxonomyAutocomplete
                     v-model="options.tax_id"
