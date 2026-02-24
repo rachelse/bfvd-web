@@ -332,7 +332,7 @@ app.get('/api/search/lca{/:taxonomy}', async (req, res) => {
     let result = await sql.all(`
         SELECT DISTINCT * 
             FROM cluster as c 
-            JOIN member as m ON c.intclu_rep_accession = m.intclu_rep_accession
+            JOIN member as m ON c.intclu_rep_accession == m.accession
             WHERE ${queries_where.join(" AND ")}
         `, taxid, ...filter_params);
     result.forEach((x) => {
