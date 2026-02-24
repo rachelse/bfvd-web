@@ -125,11 +125,6 @@ export default {
                     value: "uniprot_id",
                     sortable: false,
                 },
-                // {
-                //     text: "Interface Cluster ID",
-                //     value: "intclu_rep_accession",
-                //     sortable: false,
-                // },
                 {
                     text: "LCA",
                     value: "lca_tax_id",

@@ -5,8 +5,8 @@
 sqlite3 $1 << EOF
 
 CREATE TABLE taxonomy_lineage (
-  parent TEXT,
-	child TEXT
+  parent INTEGER,
+	child INTEGER
 );
 
 .mode tabs

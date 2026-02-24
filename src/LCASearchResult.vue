@@ -16,29 +16,36 @@
                 }"
             >
                 <template v-slot:item.structure="prop">
-                    <div style="text-align: center;">
-                        <router-link :to="{ name: 'cluster', params: { cluster: prop.item.rep_accession }}" target='_blank'>
-                            <img :src="getImage(prop.item.rep_accession)" style="height:75px"/>
+                    <div style="text-align: left;">
+                        <router-link :to="{ name: 'cluster', params: { cluster: prop.item.intclu_rep_accession }}" > <!-- target='_blank' -->
+                            <img :src="getImage(prop.item.intclu_rep_accession)" style="height:75px"/>
                         </router-link>
                     </div>
                 </template>
-    
-                <template v-slot:item.rep_accession="prop">
-                    <ExternalLinks :accession="prop.value">
-                        <router-link v-slot:accession :to="{ name: 'cluster', params: { cluster: prop.value }}" target='_blank'>{{ prop.value }}</router-link>
-                    </ExternalLinks><br>
-                    {{ prop.item.description }}
+                <template v-slot:item.pdb_id="prop">
+                    <div class="align-left">
+                        <ExternalLinks :accession="prop.value.toUpperCase()" reference="PDB" simple>
+                            <!-- <router-link v-slot:accession :to="{ name: 'cluster', params: { cluster: prop.item.intclu_rep_accession }}" target='_blank'>{{ prop.item.intclu_rep_accession }}</router-link> -->
+                        </ExternalLinks><br>
+                        {{ prop.item.description  }}
+                    </div>
                 </template>
-    
-                <template v-slot:item.avg_plddt="prop">
-                    {{ prop.value.toFixed(2) }}
+                <template v-slot:item.chains="prop">
+                    <span>{{prop.item.chain1}}</span><br><span>{{prop.item.chain2}}</span>
                 </template>
-    
-    
-                <template v-slot:item.rep_plddt="prop">
-                    {{ prop.value.toFixed(2) }}
+                <template v-slot:item.uniprot_id="prop">
+                    <div class="align-left">
+                        <span v-if="prop.item.uniprot_id1">
+                            <ExternalLinks :accession="prop.item.uniprot_id1" reference="UniProt" simple></ExternalLinks>
+                        </span>
+                        <span v-else>N/A&nbsp;</span>
+                        <br>
+                        <span v-if="prop.item.uniprot_id2">
+                            <ExternalLinks :accession="prop.item.uniprot_id2" reference="UniProt" simple></ExternalLinks>
+                        </span>
+                        <span v-else>N/A&nbsp;</span>
+                    </div>
                 </template>
-    
                 <template v-slot:header.lca_tax_id="{ header }">
                     <TaxonomyAutocomplete
                         v-model="options.tax_id"
@@ -51,57 +58,7 @@
                 <template v-slot:item.lca_tax_id="prop">
                     <TaxSpan :taxonomy="prop.value"></TaxSpan>
                 </template>
-    
-                <template v-slot:header.is_dark="{ header }">
-                    <v-menu
-                        :close-on-content-click="false"
-                        offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" :outlined="options.is_dark != null" plain>
-                                {{ header.text }}
-                            </v-btn>
-                        </template>
-    
-                        <v-card style="padding: 2em; width: 250px;">
-                            <h3>Filter by</h3>
-                            <v-chip-group column v-model="options.is_dark">
-                                <IsDark isDark="0"></IsDark>
-                                <IsDark isDark="1"></IsDark>
-                            </v-chip-group>
-                        </v-card>
-                    </v-menu>
-                </template>
-    
-                <template v-slot:item.is_dark="prop">
-                    <IsDark :isDark="prop.value"></IsDark>
-                </template>
-    
-                <template v-slot:header.avg_len="{ header }">
-                    <v-menu
-                        :close-on-content-click="false"
-                        offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
-                            </v-btn>
-                        </template>
-                        <RangeSlider :range="options.avg_length_range"></RangeSlider>
-                    </v-menu>
-                </template>
-    
-                <template v-slot:header.avg_plddt="{ header }">
-                    <v-menu
-                        :close-on-content-click="false"
-                        offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
-                            </v-btn>
-                        </template>
-                        <RangeSlider :range="options.avg_plddt_range"></RangeSlider>
-                    </v-menu>
-                </template>
-    
+
                 <template v-slot:header.n_mem="{ header }">
                     <v-menu
                         :close-on-content-click="false"
@@ -114,33 +71,6 @@
                         <RangeSlider :range="options.n_mem_range"></RangeSlider>
                     </v-menu>
                 </template>
-    
-                <template v-slot:header.rep_len="{ header }">
-                    <v-menu
-                        :close-on-content-click="false"
-                        offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
-                            </v-btn>
-                        </template>
-                        <RangeSlider :range="options.rep_length_range"></RangeSlider>
-                    </v-menu>
-                </template>
-    
-                <template v-slot:header.rep_plddt="{ header }">
-                    <v-menu
-                        :close-on-content-click="false"
-                        offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
-                            </v-btn>
-                        </template>
-                        <RangeSlider :range="options.rep_plddt_range"></RangeSlider>
-                    </v-menu>
-                </template>
-    
             </v-data-table>
         </template>
     </panel>
@@ -151,7 +81,6 @@
     import Panel from "./Panel.vue";
     import TaxSpan from "./TaxSpan.vue";
     import TaxonomyAutocomplete from "./TaxonomyAutocomplete.vue";
-    import IsDark from './IsDark.vue';
     import RangeSlider from './RangeSlider.vue';
     import ExternalLinks from "./ExternalLinks.vue";
     import ImageMixin from "./ImageMixin";
@@ -162,7 +91,6 @@
             Panel,
             TaxSpan,
             TaxonomyAutocomplete,
-            IsDark,
             RangeSlider,
             ExternalLinks
         },
@@ -180,8 +108,19 @@
                         width: "10%",
                     },
                     {
-                        text: "Accession",
-                        value: "rep_accession",
+                        text: "PDB ID",
+                        value: "pdb_id",
+                        sortable: false,
+                    },
+                    {
+                        text: "Chains",
+                        value: "chains",
+                        sortable: false,
+                        width: "10%",
+                    },
+                    {
+                        text: "UniProt",
+                        value: "uniprot_id",
                         sortable: false,
                     },
                     // {
@@ -194,44 +133,14 @@
                         sortable: false,
                     },
                     {
-                        text: "Avg. length",
-                        value: "avg_len",
-                        sortable: false,
-                    },
-                    {
-                        text: "Avg. pLDDT",
-                        value: "avg_plddt",
-                        sortable: false,
-                    },
-                    {
                         text: "Members",
                         value: "n_mem",
                         sortable: false,
                     },
-                    {
-                        text: "Dark",
-                        value: "is_dark",
-                        sortable: false,
-                    },
-                    {
-                        text: "Rep. pLDDT",
-                        value: "rep_plddt",
-                        sortable: false,
-                    },
-                    {
-                        text: "Rep. length",
-                        value: "rep_len",
-                        sortable: false,
-                    },
                 ],
                 options: {
-                    avg_length_range: [0, Infinity],
-                    avg_plddt_range: [0, Infinity],
-                    rep_length_range: [0, Infinity],
-                    rep_plddt_range: [0, Infinity],
                     n_mem_range: [0, Infinity],
                     tax_id: null,
-                    is_dark: null,
                 },
                 taxAutocompleteDisabled: false,
                 range: [5, 5],
@@ -266,9 +175,6 @@
                 } else {
                     delete copy.tax_id;
                 }
-                if (copy.is_dark == null) {
-                    delete copy.is_dark;
-                }
                 const params = new URLSearchParams(copy);
                 params.sort();
                 return { params };
@@ -288,7 +194,7 @@
                     .then(response => {
                         this.response = response.data.result;
                         this.total = response.data.total;
-                        this.fetchImages(this.response.map(m => m.rep_accession));
+                        this.fetchImages(this.response.map(m => m.intclu_rep_accession));
                         this.$emit('total', this.total);
                     })
                     .finally(() => {

@@ -89,8 +89,7 @@ app.use((req, res, next) => {
 const fileCache = new FileCache(cachePath);
 
 function finalizeResult(result, req, res) {
-    // TODO: need to refactor code to dimers
-    const is_tax_filter = req.query.tax_id1 != undefined;
+    const is_tax_filter = req.query.tax_id != undefined;
     const taxonomy_suggest = req.params.taxonomy;
 
     if (typeof(taxonomy_suggest) != "undefined") {
@@ -308,21 +307,18 @@ app.get('/api/autocomplete/go/:substring', async (req, res) => {
     res.send({ result });
 });
 
-app.get('/api/search/lca/{:taxonomy}', async (req, res) => {
+app.get('/api/search/lca{/:taxonomy}', async (req, res) => {
     const taxid = req.query.taxid;
     const lca_search_type = req.query.type;
 
-    const is_dark = req.query.is_dark;
     let filter_params = [];
-    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
-        if (typeof(req.query[i]) == "undefined") {
-            filter_params.push('0');
-            filter_params.push('INF');
-        } else {
-            const split = req.query[i].split(',');
-            filter_params.push(split[0] ?? '0');
-            filter_params.push(split[1] ?? 'INF');
-        }
+    if (req.query.n_mem_range) {
+        const split = req.query.n_mem_range.split(',');
+        filter_params.push(split[0] ?? '0');
+        filter_params.push(split[1] ?? 'INF');
+    } else {
+        filter_params.push('0');
+        filter_params.push('INF');
     }
 
     let queries_where = [];
@@ -331,21 +327,22 @@ app.get('/api/search/lca/{:taxonomy}', async (req, res) => {
     } else {
         queries_where.push("c.lca_tax_id in (SELECT child FROM taxonomy_lineage as tl WHERE tl.parent = ?)");
     }
-    queries_where.push(`c.avg_len >= ? AND c.avg_len <= ?`);
-    queries_where.push(`c.avg_plddt >= ? AND c.avg_plddt <= ?`);
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
-    queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark)
-    }
 
     let result = await sql.all(`
-    SELECT DISTINCT * 
-        FROM cluster as c 
-        WHERE ${queries_where.join(" AND ")}
-    `, taxid, ...filter_params);
+        SELECT DISTINCT * 
+            FROM cluster as c 
+            JOIN member as m ON c.intclu_rep_accession = m.intclu_rep_accession
+            WHERE ${queries_where.join(" AND ")}
+        `, taxid, ...filter_params);
+    result.forEach((x) => {
+        if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
+            x.uniprot_id1 = null;
+        }
+        if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
+            x.uniprot_id2 = null;
+        }
+    });
 
     return finalizeResult(result, req, res);
 });
