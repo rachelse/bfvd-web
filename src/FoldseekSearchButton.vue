@@ -40,8 +40,8 @@ function extractAtomRecords(pdbContent) {
     const lines = pdbContent.split('\n');
 
     let inFirstModel = false;
-    let firstChainIdentified = false;
-    let firstChainId = '';
+    // let firstChainIdentified = false;
+    // let firstChainId = '';
 
     const atomRecords = [];
     for (const line of lines) {
@@ -53,11 +53,11 @@ function extractAtomRecords(pdbContent) {
 
         if (line.startsWith('ATOM')) {
             const currentChainId = line.substring(21, 22).trim();
-            if (!firstChainIdentified) {
-                firstChainId = currentChainId;
-                firstChainIdentified = true;
-            }
-            if (currentChainId !== firstChainId) break;
+            // if (!firstChainIdentified) {
+            //     firstChainId = currentChainId;
+            //     firstChainIdentified = true;
+            // }
+            // if (currentChainId !== firstChainId) break;
 
             atomRecords.push(line);
         }
@@ -90,8 +90,8 @@ export default {
                 new Promise((resolve, reject) => {
                     this.$axios.post('https://search.foldseek.com/api/ticket', convertToQueryUrl({
                         q: extractAtomRecords(e.target.result),
-                        database: ["afdb50", "afdb-swissprot", "afdb-proteome"],
-                        mode: "3diaa"
+                        database: ["interfacedb_target"],
+                        mode: "complex-3diaa"
                     }), {
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded'

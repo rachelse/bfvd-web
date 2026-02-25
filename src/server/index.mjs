@@ -352,7 +352,7 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
     let results = [];
     if (fileCache.contains(jobid)) {
         results = JSON.parse(fileCache.get(jobid));
-        
+
     } else {
         let result = await axios.get('https://search.foldseek.com/api/result/' + jobid + '/0', {
             maxBodyLength: Infinity,
@@ -371,20 +371,24 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
                 
                 let accession = "";
                 try {
-                    accession = target.match(/AF-(.*)-F\d+-model/)[1];
+                    accession = target.match(/DI\d+_(\d+)DI/)[1];
                 } catch (e) {
                     console.log("error retrieving accession: ", target);
                     accession = "error-retrieving-accession";
                 }
-                if (result.alignments[0][j].prob < 0.95) {
-                    continue;
-                }
+                // TODO: decide filtering criteria
+                // if (result.alignments[0][j].prob < 0.95) {
+                //     continue;
+                // }
                 results.push({
                     accession: accession,
                     eval: result.alignments[0][j].eval,
                     score: result.alignments[0][j].score,
                     seqId: result.alignments[0][j].seqId,
                     prob: result.alignments[0][j].prob,
+                    complexqtm: result.alignments[0][j].complexqtm,
+                    complexttm: result.alignments[0][j].complexttm,
+
                 });
             }
         }
@@ -392,41 +396,30 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
         fileCache.add(jobid, JSON.stringify(results));
     }
 
-    const is_dark = req.query.is_dark;
     let filter_params = [];
-    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
-        if (typeof(req.query[i]) == "undefined") {
-            filter_params.push('0');
-            filter_params.push('INF');
-        } else {
-            const split = req.query[i].split(',');
-            filter_params.push(split[0] ?? '0');
-            filter_params.push(split[1] ?? 'INF');
-        }
+    if (req.query.n_mem_range) {
+        const split = req.query.n_mem_range.split(',');
+        filter_params.push(split[0] ?? '0');
+        filter_params.push(split[1] ?? 'INF');
+    } else {
+        filter_params.push('0');
+        filter_params.push('INF');
     }
 
     let queries_where = [];
-    queries_where.push(`c.avg_len >= ? AND c.avg_len <= ?`);
-    queries_where.push(`c.avg_plddt >= ? AND c.avg_plddt <= ?`);
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
-    queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark ? '1' : '0')
-    }
 
     const accessions = results.map(r => r.accession);
     let result = await sql.all(`
         SELECT DISTINCT *
             FROM cluster as c
-            WHERE c.rep_accession in (
-                SELECT DISTINCT rep_accession
+            JOIN member as m ON c.intclu_rep_accession == m.accession
+            WHERE c.intclu_rep_accession in (
+                SELECT DISTINCT intclu_rep_accession
                 FROM member
                 WHERE accession IN (${accessions.map(() => '?').join(',')})
             ) AND ${queries_where.join(" AND ")}
             `, ...accessions, ...filter_params);
-
     return finalizeResult(result, req, res);
 });
 
