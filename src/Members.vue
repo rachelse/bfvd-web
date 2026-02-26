@@ -117,7 +117,8 @@
         </template>
 
         <template v-slot:item.actions="{ item }">
-            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/search?accession=' + item.accession + '&source=AlphaFoldDB'" target="_blank">
+            <!-- TODO: we cannot source it from external database -->
+            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/multimer?accession=' + item.accession + '&source=AlphaFoldDB'" target="_blank">
                 <v-img :src="require('./assets/marv-foldseek-small.png')" max-width="16"></v-img>
             </v-chip>
         </template>
