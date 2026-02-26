@@ -28,14 +28,15 @@ import {
     mdiFullscreen,
     mdiArrowRightCircle,
     mdiArrowRightCircleOutline,
-    mdiCircle,
-    mdiCircleHalf,
     mdiPlusBox,
     mdiMinusBox,
     mdiOpenInNew,
     mdiDotsVertical,
     mdiGithub,
     mdiExport,
+    mdiCircleHalf,
+    mdiCircle,
+    mdiCircleOpacity,
 } from '@mdi/js'
 
 Vue.use(VueRouter);
@@ -110,6 +111,7 @@ Vue.use({
             ArrowRightCircleOutline: mdiArrowRightCircleOutline,
             Circle: mdiCircle,
             CircleHalf: mdiCircleHalf,
+            CircleOpacity: mdiCircleOpacity,
             PlusBox: mdiPlusBox,
             MinusBox: mdiMinusBox,
             DotsVertical: mdiDotsVertical,

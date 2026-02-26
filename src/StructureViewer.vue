@@ -80,6 +80,13 @@
                     <v-icon v-bind="tbIconBindings">{{ $MDI.Fullscreen }}</v-icon>
                     <span v-if="isFullscreen">&nbsp;Fullscreen</span>
                 </v-btn>
+                <v-btn v-bind="tbButtonBindings"
+                    v-on:click="updateStructureMode()"
+                    title="Switch between showing only the interface, highlighting the interface, or showing the whole structure"
+                >
+                    <v-icon v-bind="tbIconBindings">{{ structureMode == 0 ? $MDI.CircleHalf : (structureMode == 1 ? $MDI.Circle : $MDI.CircleOpacity) }}</v-icon>
+                    <span v-if="isFullscreen">&nbsp;{{ structureMode == 0 ? 'Only Interface' : (structureMode == 1 ? 'Whole Structure' : 'Highlight Interface') }}</span>
+                </v-btn>
                 </v-item-group>
             </div>
             <div class="structure-viewer" ref="viewport"></div>
@@ -112,8 +119,7 @@ import { encode_mmCIF_categories_default, CifExportContext } from 'molstar/lib/m
 import { ObjExporter } from 'molstar/lib/extensions/geo-export/obj-exporter';
 import { StateTransforms } from 'molstar/lib/mol-state/transform.js';
 import { Mat4 } from 'molstar/lib/mol-math/linear-algebra.js';
-import { Color } from 'molstar/lib/mol-util/color/index.js';
-import { isProtein, MoleculeType } from 'molstar/lib/mol-model/structure/model/types';
+import { isProtein } from 'molstar/lib/mol-model/structure/model/types';
 
 import Panel from './Panel.vue';
 import { pulchra } from 'pulchra-wasm';
@@ -166,26 +172,71 @@ function generatePdbAtoms(structureData) {
     return atomLines.join('\n');
 }
 
-function chainSelection(auth_asym_id) {
-    return MS.struct.generator.atomGroups({
-        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), auth_asym_id])
-    });
-}
+async function addStructureRepresentation(plugin, structure, chainId1, chainId2, color1, color2, mode = 0, radius = 10.0) {
+    if (mode > 2 || mode < 0) throw new Error("Invalid mode for addStructureRepresentation. Must be 0 (highlight interface), 1 (only interface), or 2 (whole structure).");
 
-async function addChainRepresentation(
-    plugin, structure, chain, label, color
-) {
-    const component = await plugin.builders.structure.tryCreateComponentFromExpression(
-        structure,
-        chainSelection(chain),
-        label
-    );
-    if (component) {
-        await plugin.builders.structure.representation.addRepresentation(component, {
-            type: 'cartoon',
-            color: 'uniform',
-            colorParams: { value: color }
+    // TODO: Save chain1, chain2, interface1, interface2 in state and reuse them when switching modes instead of re-creating them every time
+    const chain1 = MS.struct.generator.atomGroups({
+        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId1])
+    });
+
+    const chain2 = MS.struct.generator.atomGroups({
+        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId2])
+    });
+
+    let interface1, interface2;
+    let component1, component2;
+
+    if (mode === 2) { // Show whole structure
+        component1 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, chain1, `${chainId1}`);
+        component2 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, chain2, `${chainId2}`);
+    } else {
+        interface1 = MS.struct.modifier.intersectBy({
+            0: chain1,
+            by: MS.struct.modifier.includeSurroundings({
+                0: chain2, radius: radius, 'as-whole-residues': true
+            })
         });
+
+        interface2 = MS.struct.modifier.intersectBy({
+            0: chain2,
+            by: MS.struct.modifier.includeSurroundings({
+                0: chain1, radius: radius, 'as-whole-residues': true
+            })
+        });
+        component1 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, interface1, `${chainId1}-interface`);
+        component2 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, interface2, `${chainId2}-interface`);
+    }
+
+    if (component1) {
+        await plugin.builders.structure.representation.addRepresentation(component1, {
+            type: 'cartoon', color: 'uniform', colorParams: { value: color1 },
+        }, { tag: 'chain-1-ui' });
+    }
+    if (component2) {
+        await plugin.builders.structure.representation.addRepresentation(component2, {
+            type: 'cartoon', color: 'uniform', colorParams: { value: color2 },
+        }, { tag: 'chain-2-ui' })
+    }
+
+    if (mode !== 0) return; // No interface highlighting
+
+    let nonInterface1 = MS.struct.modifier.exceptBy({0: chain1, by: interface1});
+    let nonInterface2 = MS.struct.modifier.exceptBy({0: chain2, by: interface2});
+    const restComp1 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, nonInterface1, `${chainId1}-faded1`);
+    const restComp2 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, nonInterface2, `${chainId2}-faded2`);
+
+    if (restComp1) {
+        await plugin.builders.structure.representation.addRepresentation(restComp1, {
+            type: 'cartoon', color: 'uniform', colorParams: { value: color1 },
+            typeParams: { alpha: 0.3, transparentBackfaces: 'off' },
+        }, { tag: 'chain-1-ui' });
+    }
+    if (restComp2) {
+        await plugin.builders.structure.representation.addRepresentation(restComp2, {
+            type: 'cartoon', color: 'uniform', colorParams: { value: color2 },
+            typeParams: { alpha: 0.3, transparentBackfaces: 'off' },
+        }, { tag: 'chain-2-ui' });
     }
 }
 
@@ -220,7 +271,6 @@ function getCAPositions(unit) {
 }
 
 async function getInterfaceResidues(structure, chain1, chain2, thresholdSq = 10.0 * 10.0) {
-    
     let { units } = structure.data;
     units = units.filter(unit => { // Make sure we only have protein chains
         return isProtein(unit.model.atomicHierarchy.derived.residue.moleculeType[0]);
@@ -282,7 +332,8 @@ export default {
         interfaceMap: null,
         'isFullscreen': false,
         'hovered': false,
-        colors: Colors
+        colors: Colors,
+        structureMode: 0, // 0: highlight interface, 1: only interface, 2: whole structure
     }),
     props: {
         'cluster': { type: String, required: true },
@@ -356,8 +407,7 @@ export default {
                 
                 this.component = structure;
 
-                await addChainRepresentation(this.plugin, this.component, 'A', "Chain 1", Colors.purple.hex);
-                await addChainRepresentation(this.plugin, this.component, 'B', "Chain 2", Colors.skyblue.hex);
+                await addStructureRepresentation(this.plugin, this.component, 'A', 'B', Colors.purple.hex, Colors.skyblue.hex, this.structureMode);
 
                 this.plugin?.managers.camera.reset();
 
@@ -476,6 +526,26 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        },
+
+        async updateStructureMode() {
+            this.structureMode = (this.structureMode + 1) % 3;
+            if (this.component) {
+                const allCells = Array.from(this.plugin.state.data.cells.values());
+                const cellsToDelete = allCells.filter(cell => {
+                    const tags = cell.transform?.tags;
+                    return Array.isArray(tags) && (
+                        tags.includes('chain-1-ui') || tags.includes('chain-2-ui')
+                    );
+                });
+                const update = this.plugin.build();
+                for (const cell of cellsToDelete) {
+                    update.delete(cell.transform.ref);
+                }
+                await update.commit();
+                addStructureRepresentation(this.plugin, this.component, 'A', 'B', Colors.purple.hex, Colors.skyblue.hex, this.structureMode);
+                this.plugin?.managers.camera.reset();
+            }
         },
 
         async fetchStructure(accession) {
