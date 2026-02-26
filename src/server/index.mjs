@@ -807,6 +807,37 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
 
             res.end();
             break;
+
+        case 'summary':
+            res.setHeader('Content-Disposition', `attachment; filename=member-summary-${safeCluster}.tsv`);
+            res.setHeader('Content-Type', 'text/plain');
+            res.charset = 'UTF-8';
+            
+            const headers = ['accession', 'description', 'pdb_id', 'chainA', 'chainB', 'uniprot_idA', 'uniprot_idB', 'tax_idA', 'tax_idB', 'flag'];
+            res.write(headers.join('\t') + '\n');
+            
+            processAndWriteInChunks(result, 10000,
+                chunk => chunk.map(member => {
+                    return [
+                        member.accession,
+                        member.description, // Passed raw, handled safely below
+                        member.pdb_id,
+                        member.chain1,
+                        member.chain2,
+                        member.uniprot_id1,
+                        member.uniprot_id2,
+                        member.tax_id1 ? member.tax_id1.id : '',
+                        member.tax_id2 ? member.tax_id2.id : '',
+                        member.flag == 1 ? 'Member' : member.flag == 2 ? 'DimerCluster Representative' : member.flag == 3 ? 'InterfaceCluster Representative' : ''
+                    ]
+                    // Clean nulls, newlines, carriage returns, and tabs all at once
+                    .map(val => String(val || '').replace(/[\r\n\t]+/g, ' '))
+                    .join('\t');
+                }).join('\n') + '\n',
+                chunk => res.write(chunk)
+            );
+            res.end();
+            break;
         
         default:
             res.status(400).send({ error: 'Unsupported format!' });

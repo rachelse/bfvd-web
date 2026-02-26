@@ -104,7 +104,7 @@ import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18.js';
 import { DefaultPluginUISpec } from 'molstar/lib/mol-plugin-ui/spec.js';
 import { Vec3 } from 'molstar/lib/mol-math/linear-algebra';
 import { Segmentation } from 'molstar/lib/mol-data/int';
-import { StructureSelection, QueryContext, StructureElement,  } from 'molstar/lib/mol-model/structure';
+import { StructureSelection, QueryContext, StructureElement, StructureProperties as SP } from 'molstar/lib/mol-model/structure';
 import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder';
 import { compile } from 'molstar/lib/mol-script/runtime/query/compiler';
 import { canvasToBlob } from 'molstar/lib/mol-canvas3d/util';
@@ -132,11 +132,46 @@ const tmalign = function(pdb1, pdb2) {
     });
 };
 
+function generatePdbAtoms(structureData) {
+    if (!structureData) return '';
+    const l = StructureElement.Location.create(structureData);
+    const atomLines = [];
+
+    for (const unit of structureData.units) {
+        const elements = unit.elements;
+        console.log("RACHEL checking elements: ", elements);
+        l.unit = unit;
+        
+        for (let j = 0; j < elements.length; j++) {
+            l.element = elements[j];
+            
+            // TODO: allow only protein
+            const isPolymer = SP.entity.type(l) === 'polymer';
+            if (!isPolymer) continue;
+            
+            const atomSerial = SP.atom.id(l).toString().padStart(5, ' ');
+            const atomName = SP.atom.label_atom_id(l).padStart(4, ' ').substring(0, 4);
+            const resName = SP.residue.label_comp_id(l).padStart(3, ' ').substring(0, 3);
+            const chainId = SP.chain.auth_asym_id(l) || SP.chain.label_asym_id(l) || 'A';
+            const resSeq = SP.residue.label_seq_id(l).toString().padStart(4, ' ');
+            const x = SP.atom.x(l).toFixed(3).padStart(8, ' ');
+            const y = SP.atom.y(l).toFixed(3).padStart(8, ' ');
+            const z = SP.atom.z(l).toFixed(3).padStart(8, ' ');
+            const elementSymbol = SP.atom.type_symbol(l).padStart(2, ' ');
+            
+            const line = `ATOM  ${atomSerial} ${atomName} ${resName} ${chainId}${resSeq}    ${x}${y}${z}  1.00  0.00           ${elementSymbol}  `;
+            atomLines.push(line);
+        }
+    }
+    return atomLines.join('\n');
+}
+
 function chainSelection(auth_asym_id) {
     return MS.struct.generator.atomGroups({
         'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), auth_asym_id])
     });
 }
+
 async function addChainRepresentation(
     plugin, structure, chain, label, color
 ) {
@@ -184,7 +219,7 @@ function getCAPositions(unit) {
     return caUnitIndex;
 }
 
-async function getInterfaceResidues(structure, chain1, chain2, thresholdSq = 8.0 * 8.0) {
+async function getInterfaceResidues(structure, chain1, chain2, thresholdSq = 10.0 * 10.0) {
     
     let { units } = structure.data;
     units = units.filter(unit => { // Make sure we only have protein chains
@@ -252,8 +287,6 @@ export default {
     props: {
         'cluster': { type: String, required: true },
         'second': { type: String, required: true },
-        // 'chain1': { type: String, required: true },
-        // 'chain2': { type: String, required: true },
         'toolbar': { type: Boolean, default: true },
         'bgColorLight': { type: String, default: Colors.white.hex },
         'bgColorDark': { type: String, default: Colors.black.hex },
@@ -304,9 +337,77 @@ export default {
             return structure;
         },
 
-        resetView() {
+        async loadClusterStructure() {
+            if (!this.plugin || !this.cluster) return;
+            await this.plugin.clear();
+            this.component = null;
+            this.secondComponent = null;
+
+            try {
+                const response = await this.$axios.get("/chainid/" + this.cluster);
+                if (!response || !response.data) return;
+
+                const structure = await this.fetchDimerStructure(
+                    response.data.chain1_id, 
+                    response.data.chain2_id, 
+                    response.data.chain1, 
+                    response.data.chain2
+                );
+                
+                this.component = structure;
+
+                await addChainRepresentation(this.plugin, this.component, 'A', "Chain 1", Colors.purple.hex);
+                await addChainRepresentation(this.plugin, this.component, 'B', "Chain 2", Colors.skyblue.hex);
+
+                this.plugin?.managers.camera.reset();
+
+                if (this.second && this.second !== "") {
+                    await this.loadSecondStructure();
+                }
+            } catch (error) {
+                console.error("Error loading cluster structure:", error);
+            }
+        },
+
+        async loadSecondStructure() {
+            if (!this.plugin || !this.second || this.second === "") return;
+
+            if (this.secondComponent) {
+                await this.plugin.build().delete(this.secondComponent).commit();
+                this.secondComponent = null;
+            }
+
+            try {
+                const response = await this.$axios.get("/chainid/" + this.second);
+                if (!response || !response.data) return;
+
+                const secondStructure = await this.fetchDimerStructure(
+                    response.data.chain1_id, 
+                    response.data.chain2_id, 
+                    response.data.chain1, 
+                    response.data.chain2
+                );
+
+                this.secondComponent = secondStructure;
+                // TODO: Change representation
+                await this.plugin.builders.structure.hierarchy.applyPreset(this.secondComponent, "default");
+
+                // TODO: ADD TM-align superposition here
+
+                this.plugin?.managers.camera.reset();
+            } catch (error) {
+                console.error("Error loading second structure:", error);
+            }
+        },
+
+        async resetView() {
+            if (!this.plugin) return;
+            if (this.secondComponent) {
+                await this.plugin.build().delete(this.secondComponent).commit();
+                this.secondComponent = null;
+                this.$emit('reset', null);
+            }
             this.plugin?.managers.camera.reset();
-            // TODO: also reset selections
         },
 
         async makeImage() {
@@ -344,7 +445,6 @@ export default {
             }
         },
         async makePdb() {
-            // Fixme: Implement PDB export (It's not working)
             if (!this.plugin) return;
             if (!this.component) return;
             const header = `REMARK     This file was generated by the Foldseek clusters webserver:
@@ -355,38 +455,27 @@ REMARK     Warning: Please refer to the original PDB files.
 REMARK       This file was auto-generated from compressed information:
 REMARK         * Non C-alpha atoms were re-generated by PULCHRA.
 REMARK         * Residue/atom indices were sequentially renumbered`;
+            
+            const structrure1Data = this.component.obj.data;
+            const pdb1String = generatePdbAtoms(structrure1Data);
+            let result = '';
             if (!this.secondComponent) {
-                // TODO
-                // const encoder = new CifWriter.Encoder();
-                // let cif = encode_mmCIF_categories_default(encoder, this.component.structure);
-                // let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
-                //                 pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                //                 let result =
-                // `TITLE     ${this.cluster}
-                // ${header}
-                // ${pdb}
-                // END
-                // `;
-                // download(new Blob([result], { type: 'text/plain' }), this.cluster + ".pdb");
+                result = `TITLE     ${this.cluster}\n${header}\n${pdb1String}\nEND\n`;
             } else {
-                // TODO
-                //                 let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
-                //                 pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                //                 let pdb2 = new PdbWriter(this.secondComponent.structure, { renumberSerial: false }).getData();
-                //                 pdb2 = pdb2.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                //                 let result =
-                // `TITLE     ${this.cluster}+${this.second}
-                // ${header}
-                // MODEL        1
-                // ${pdb}
-                // ENDMDL
-                // MODEL        2
-                // ${pdb2}
-                // ENDMDL
-                // END
-                // `;
-                //                 download(new Blob([result], { type: 'text/plain' }), this.cluster + '+' + this.second + ".pdb");
+                const structrure2Data = this.secondComponent.obj.data;
+                const pdb2String = generatePdbAtoms(structrure2Data);
+                result = `TITLE     ${this.cluster}+${this.second}\n${header}\nMODEL        1\n${pdb1String}\nENDMDL\nMODEL        2\n${pdb2String}\nENDMDL\nEND\n`;
             }
+
+            const blob = new Blob([result], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.cluster}${this.second ? '-' + this.second : ''}.pdb`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         },
 
         async fetchStructure(accession) {
@@ -428,34 +517,11 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
     },
     watch: {
         'cluster': {
-            async handler(val) {
-                // TODO: Figure out when it's called
-                if (!val || !this.plugin) return;
-                await this.plugin.clear();
-                const response = await this.$axios.get("/chainid/" + val);
-                if (!response || !response.data) return;
-                structure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2);
-                this.component = await this.plugin.builders.structure.hierarchy.applyPreset(structure, "default");
-                this.resetView();
-            },
+            handler: 'loadClusterStructure',
             immediate: false
         },
         'second': {
-            async handler(val) {
-                if (!val || val === "" || !this.plugin) return;
-                const response = await this.$axios.get("/chainid/" + val);
-                if (!response || !response.data) return;
-
-                const secondStructure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2);
-                const secondData = await this.plugin.builders.structure.hierarchy.applyPreset(secondStructure, "default");
-                this.secondComponent = secondData;
-
-                // TODO: Here you would integrate your transformStructure logic
-                // Molstar uses Mat4.fromArray for rotation/translation matrices
-                // this.plugin.builders.structure.transform(this.secondComponent.structure, matrix);
-                
-                this.resetView();
-            }
+            handler: 'loadSecondStructure',
         }
     },
     async mounted() {
@@ -471,20 +537,14 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
 
         document.addEventListener('fullscreenchange', fullscreenHandler);
         document.addEventListener('webkitfullscreenchange', fullscreenHandler);
+        this._fullscreenHandler = fullscreenHandler;
 
-        if (!(this.cluster)) return;
-        const response = await this.$axios.get("/chainid/" + this.cluster);
-        if (!response || !response.data) return;
-
-        const structure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2);
-        await addChainRepresentation(this.plugin, structure, 'A', "Chain 1", Colors.purple.hex);
-        await addChainRepresentation(this.plugin, structure, 'B', "Chain 2", Colors.skyblue.hex);
-        // this.component = await this.plugin.builders.structure.hierarchy.applyPreset(structure, "default");
-        this.resetView();
+        if (this.cluster) {
+            await this.loadClusterStructure();
+        }
         // const interfaceMap = getInterfaceResidues(structure, response.data.chain1, response.data.chain2);
         // this.interfaceMap = interfaceMap;
 
-        this._fullscreenHandler = fullscreenHandler;
     },
     beforeDestroy() {
         document.removeEventListener('fullscreenchange', this._fullscreenHandler);

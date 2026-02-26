@@ -5,27 +5,10 @@
     </template>
 
     <template v-slot:toolbar-extra>
-        <v-menu offset-y>
-            <template v-slot:activator="{ on }">
-                <v-btn plain v-on="on">
-                    <v-icon class="mr-1">{{ $MDI.Export }}</v-icon>
-                    Export
-                </v-btn>
-            </template>
-            <v-list>
-                <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/members?format=accessions&${requestOptions.params.toString()}`" target="_blank">
-                    <v-list-item-content>
-                        <!-- <v-list-item-title>Accessions</v-list-item-title> -->
-                        <v-list-item-title>Accessions</v-list-item-title>
-                    </v-list-item-content>
-                </v-list-item>
-                <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/members?format=fasta&${requestOptions.params.toString()}`" target="_blank">
-                    <v-list-item-content>
-                        <v-list-item-title>FASTA</v-list-item-title>
-                    </v-list-item-content>
-                </v-list-item>
-            </v-list>
-        </v-menu>
+        <v-btn plain :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/members?format=summary&${requestOptions.params.toString()}`" target="_blank">
+            <v-icon class="mr-1">{{ $MDI.Export }}</v-icon>
+            Export
+        </v-btn>
     </template>
         
 <template v-slot:content v-if="$route.params.cluster">
@@ -95,9 +78,9 @@
                             <span>
                                 <img width="600" src="./assets/cluster_step.jpg"><br>
                                 <!-- TODO -->
-                                Interface Representative: TODO <br>
-                                Dimer Representative: TODO <br>
                                 Member: TODO <br>
+                                Dimer Representative: TODO <br>
+                                Interface Representative: TODO <br>
                                 <!-- AFDB/Foldseek: Clustered with structural similarity<br> -->
                                 <!-- AFDB50/Mmseqs: Clustered at sequence identity 50%<br> -->
                                 <!-- Fragment: Removed fragments among AFDB50<br> -->
@@ -277,7 +260,7 @@ export default {
                 .finally(() => {
                     this.loading = false;
                 });
-        }
+        },
     }
 }
 
