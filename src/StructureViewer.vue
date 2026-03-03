@@ -94,7 +94,23 @@
         <template v-if="second">
             <span v-if="secondComponent == null">Superposition loading</span>
             <template v-else>
-                <span :style="{ color: colors.yellow_fs.code }">{{ second }}</span> superposed on representative <span :style="{ color: colors.blue_fs.code }">{{ cluster }}</span>
+                <div class="d-flex align-center">
+                    <span style="position: relative; display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center;" class="mr-1">
+                        <v-icon :color="seccol1.code" size="small" style="position: absolute;">
+                        {{ $MDI.CircleHalf }} </v-icon><v-icon :color="seccol2.code" size="small" style="position: absolute; transform: scaleX(-1);">
+                        {{ $MDI.CircleHalf }} </v-icon>
+                    </span>
+                        <span>{{ second }}</span> 
+                        &nbsp;superposed on representative&nbsp;
+                    <span style="position: relative; display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center;" class="mr-1">
+                        <v-icon :color="col1.code" size="small" style="position: absolute;">
+                            {{ $MDI.CircleHalf }} 
+                        </v-icon><v-icon :color="col2.code" size="small" style="position: absolute; transform: scaleX(-1);">
+                            {{ $MDI.CircleHalf }} 
+                        </v-icon>
+                    </span>
+                    <span>{{ cluster }}</span>
+                </div>
                 <template v-if="tmOutput">
                     <br>
                     <span><strong>TM-score:</strong>&nbsp; {{ tmOutput.tmScore.toFixed(2) }}</span>&nbsp;
@@ -114,10 +130,7 @@ import { Segmentation } from 'molstar/lib/mol-data/int';
 import { StructureSelection, QueryContext, StructureElement, StructureProperties as SP } from 'molstar/lib/mol-model/structure';
 import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder';
 import { compile } from 'molstar/lib/mol-script/runtime/query/compiler';
-import { canvasToBlob } from 'molstar/lib/mol-canvas3d/util';
-import { encode_mmCIF_categories_default, CifExportContext } from 'molstar/lib/mol-model/structure/export/mmcif';
-import { ObjExporter } from 'molstar/lib/extensions/geo-export/obj-exporter';
-import { StateTransforms } from 'molstar/lib/mol-state/transform.js';
+import { StateTransforms } from 'molstar/lib/mol-plugin-state/transforms';
 import { Mat4 } from 'molstar/lib/mol-math/linear-algebra.js';
 import { isProtein } from 'molstar/lib/mol-model/structure/model/types';
 
@@ -125,8 +138,6 @@ import Panel from './Panel.vue';
 import { pulchra } from 'pulchra-wasm';
 import { setChainName, mockPDB } from './Utils.js';
 import * as Colors from './Colors.js';
-import { transform } from '@vue/compiler-dom';
-import { CifWriter } from 'molstar/lib/mol-io/writer/cif';
 
 // TM-align worker setup stays same
 const worker = new Worker(new URL('./tmalign-worker.js', import.meta.url));
@@ -145,7 +156,6 @@ function generatePdbAtoms(structureData) {
 
     for (const unit of structureData.units) {
         const elements = unit.elements;
-        console.log("RACHEL checking elements: ", elements);
         l.unit = unit;
         
         for (let j = 0; j < elements.length; j++) {
@@ -156,9 +166,13 @@ function generatePdbAtoms(structureData) {
             if (!isPolymer) continue;
             
             const atomSerial = SP.atom.id(l).toString().padStart(5, ' ');
-            const atomName = SP.atom.label_atom_id(l).padStart(4, ' ').substring(0, 4);
+            const rawAtomName = SP.atom.label_atom_id(l);
+            const atomName = rawAtomName.length < 4 
+                ? ` ${rawAtomName}`.padEnd(4, ' ') 
+                : rawAtomName.substring(0, 4);
             const resName = SP.residue.label_comp_id(l).padStart(3, ' ').substring(0, 3);
-            const chainId = SP.chain.auth_asym_id(l) || SP.chain.label_asym_id(l) || 'A';
+            let chainId = SP.chain.auth_asym_id(l) || SP.chain.label_asym_id(l) || 'A';
+            chainId = chainId.padStart(1, ' ').substring(0, 1);
             const resSeq = SP.residue.label_seq_id(l).toString().padStart(4, ' ');
             const x = SP.atom.x(l).toFixed(3).padStart(8, ' ');
             const y = SP.atom.y(l).toFixed(3).padStart(8, ' ');
@@ -172,72 +186,27 @@ function generatePdbAtoms(structureData) {
     return atomLines.join('\n');
 }
 
-async function addStructureRepresentation(plugin, structure, chainId1, chainId2, color1, color2, mode = 0, radius = 10.0) {
-    if (mode > 2 || mode < 0) throw new Error("Invalid mode for addStructureRepresentation. Must be 0 (highlight interface), 1 (only interface), or 2 (whole structure).");
-
-    // TODO: Save chain1, chain2, interface1, interface2 in state and reuse them when switching modes instead of re-creating them every time
-    const chain1 = MS.struct.generator.atomGroups({
-        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId1])
-    });
-
-    const chain2 = MS.struct.generator.atomGroups({
-        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId2])
-    });
-
-    let interface1, interface2;
-    let component1, component2;
-
-    if (mode === 2) { // Show whole structure
-        component1 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, chain1, `${chainId1}`);
-        component2 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, chain2, `${chainId2}`);
-    } else {
-        interface1 = MS.struct.modifier.intersectBy({
-            0: chain1,
-            by: MS.struct.modifier.includeSurroundings({
-                0: chain2, radius: radius, 'as-whole-residues': true
-            })
-        });
-
-        interface2 = MS.struct.modifier.intersectBy({
-            0: chain2,
-            by: MS.struct.modifier.includeSurroundings({
-                0: chain1, radius: radius, 'as-whole-residues': true
-            })
-        });
-        component1 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, interface1, `${chainId1}-interface`);
-        component2 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, interface2, `${chainId2}-interface`);
-    }
-
-    if (component1) {
-        await plugin.builders.structure.representation.addRepresentation(component1, {
-            type: 'cartoon', color: 'uniform', colorParams: { value: color1 },
-        }, { tag: 'chain-1-ui' });
-    }
-    if (component2) {
-        await plugin.builders.structure.representation.addRepresentation(component2, {
-            type: 'cartoon', color: 'uniform', colorParams: { value: color2 },
-        }, { tag: 'chain-2-ui' })
-    }
-
-    if (mode !== 0) return; // No interface highlighting
-
-    let nonInterface1 = MS.struct.modifier.exceptBy({0: chain1, by: interface1});
-    let nonInterface2 = MS.struct.modifier.exceptBy({0: chain2, by: interface2});
-    const restComp1 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, nonInterface1, `${chainId1}-faded1`);
-    const restComp2 = await plugin.builders.structure.tryCreateComponentFromExpression(structure, nonInterface2, `${chainId2}-faded2`);
-
-    if (restComp1) {
-        await plugin.builders.structure.representation.addRepresentation(restComp1, {
-            type: 'cartoon', color: 'uniform', colorParams: { value: color1 },
+async function addStructureRepresentation(plugin, color1, color2, main1, main2, transparent1 = null, transparent2 = null) {
+    if (transparent1) {
+        await plugin.builders.structure.representation.addRepresentation(transparent1, {
+            type: 'cartoon', color: 'uniform', colorParams: { value: 0xFFFFFF /* color1*/ },
             typeParams: { alpha: 0.3, transparentBackfaces: 'off' },
         }, { tag: 'chain-1-ui' });
     }
-    if (restComp2) {
-        await plugin.builders.structure.representation.addRepresentation(restComp2, {
-            type: 'cartoon', color: 'uniform', colorParams: { value: color2 },
+
+    if (transparent2) {
+        await plugin.builders.structure.representation.addRepresentation(transparent2, {
+            type: 'cartoon', color: 'uniform', colorParams: { value: 0xFFFFFF /* color2*/ },
             typeParams: { alpha: 0.3, transparentBackfaces: 'off' },
         }, { tag: 'chain-2-ui' });
     }
+
+    await plugin.builders.structure.representation.addRepresentation(main1, {
+        type: 'cartoon', color: 'uniform', colorParams: { value: color1 },
+    }, { tag: 'chain-1-ui' });
+    await plugin.builders.structure.representation.addRepresentation(main2, {
+        type: 'cartoon', color: 'uniform', colorParams: { value: color2 },
+    }, { tag: 'chain-2-ui' });
 }
 
 function getCAPositions(unit) {
@@ -329,10 +298,20 @@ export default {
         component: null, // Primary Structure
         secondComponent: null, // Superposed Structure
         tmOutput: null,
-        interfaceMap: null,
+        chain1: null,
+        chain2: null,
+        interface1: null,
+        interface2: null,
+        secondChain1: null,
+        secondChain2: null,
+        secondInterface1: null,
+        secondInterface2: null,
         'isFullscreen': false,
         'hovered': false,
-        colors: Colors,
+        col1: Colors.purple,
+        col2: Colors.aquaBlue, 
+        seccol1: Colors.lightPurple,
+        seccol2: Colors.skyblue,
         structureMode: 0, // 0: highlight interface, 1: only interface, 2: whole structure
     }),
     props: {
@@ -373,18 +352,6 @@ export default {
             const trajectory = await this.plugin.builders.structure.parseTrajectory(data, 'pdb');
             const model = await this.plugin.builders.structure.createModel(trajectory);
             const structure = await this.plugin.builders.structure.createStructure(model, { name: 'model', params: {} });
-            // const polymer = await this.plugin.builders.structure.tryCreateComponentStatic(structure, 'polymer');
-            // TEST
-            // const caQuery1 = compile(MS.struct.generator.atomGroups({
-            //     'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'A']),
-            //     'atom-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.label_atom_id(), 'CA'])
-            // }));
-            // const structure1data = structure.obj.data // preset.structure.cell?.obj.data;
-            // // console.log(structure1data ==  structure.obj.data)
-            // console.log(structure.obj.data)
-            // const sel1 = StructureSelection.toLociWithCurrentUnits(caQuery1(new QueryContext(structure1data)));
-            // const loci1 = StructureElement.Loci.is(sel1) ? sel1 : StructureElement.Loci.none(structure1Data);
-            // console.log(loci1)
             return structure;
         },
 
@@ -406,14 +373,6 @@ export default {
                 );
                 
                 this.component = structure;
-
-                await addStructureRepresentation(this.plugin, this.component, 'A', 'B', Colors.purple.hex, Colors.skyblue.hex, this.structureMode);
-
-                this.plugin?.managers.camera.reset();
-
-                if (this.second && this.second !== "") {
-                    await this.loadSecondStructure();
-                }
             } catch (error) {
                 console.error("Error loading cluster structure:", error);
             }
@@ -430,20 +389,49 @@ export default {
             try {
                 const response = await this.$axios.get("/chainid/" + this.second);
                 if (!response || !response.data) return;
-
                 const secondStructure = await this.fetchDimerStructure(
-                    response.data.chain1_id, 
-                    response.data.chain2_id, 
-                    response.data.chain1, 
-                    response.data.chain2
+                    response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2
+                );
+                this.secondComponent = secondStructure;
+
+                const { chain1, chain2, interface1, interface2 } = await this.getStructureCompoments(secondStructure);
+                this.secondChain1 = chain1;
+                this.secondChain2 = chain2;
+                this.secondInterface1 = interface1;
+                this.secondInterface2 = interface2;
+                const ref_int1 = generatePdbAtoms(this.interface1.obj.data);
+                const ref_int2 = generatePdbAtoms(this.interface2.obj.data);
+                const ref_int = ref_int1 + "\n" + ref_int2;
+                
+                const tar_int1 = generatePdbAtoms(interface1.obj.data);
+                const tar_int2 = generatePdbAtoms(interface2.obj.data);
+                const tar_int = tar_int1 + "\n" + tar_int2;
+                const result = await tmalign(ref_int, tar_int);
+                this.tmOutput = result.output;
+                const { t, u } = result.matrix;
+                
+                let mat = Mat4.ofRows([
+                    [u[0][0], u[0][1], u[0][2], t[0]],
+                    [u[1][0], u[1][1], u[1][2], t[1]],
+                    [u[2][0], u[2][1], u[2][2], t[2]],
+                    [0, 0, 0, 1]]
                 );
 
-                this.secondComponent = secondStructure;
-                // TODO: Change representation
-                await this.plugin.builders.structure.hierarchy.applyPreset(this.secondComponent, "default");
+                await this.plugin.build()
+                    .to(this.secondComponent)
+                    .insert(StateTransforms.Model.TransformStructureConformation, {
+                        transform: {name: 'matrix',params: { data: Mat4.invert(Mat4(), mat), transpose: false }}
+                    })
+                    .commit();
 
-                // TODO: ADD TM-align superposition here
-
+                if (this.structureMode === 0) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2);
+                } else if (this.structureMode === 1) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2);
+                } else if (this.structureMode === 2) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, chain1, chain2);
+                }
+                // await this.plugin.builders.structure.representation.applyPreset(this.secondComponent, 'auto');
                 this.plugin?.managers.camera.reset();
             } catch (error) {
                 console.error("Error loading second structure:", error);
@@ -543,9 +531,28 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
                     update.delete(cell.transform.ref);
                 }
                 await update.commit();
-                addStructureRepresentation(this.plugin, this.component, 'A', 'B', Colors.purple.hex, Colors.skyblue.hex, this.structureMode);
-                this.plugin?.managers.camera.reset();
             }
+            if ( this.structureMode === 0) {
+                // Default: Show whole structure (transparent) with interface highlighted
+                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2);
+            } else if (this.structureMode === 1) {
+                // Show only interface
+                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2);
+            } else if (this.structureMode === 2) {
+                // Show whole structure
+                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.chain1, this.chain2);
+            }
+
+            if (this.secondComponent) {
+                if ( this.structureMode === 0) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2, this.secondChain1, this.secondChain2);
+                } else if (this.structureMode === 1) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2);
+                } else if (this.structureMode === 2) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondChain1, this.secondChain2);
+                }
+            }
+            this.plugin?.managers.camera.reset();
         },
 
         async fetchStructure(accession) {
@@ -569,6 +576,26 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
 
             const structure = await this.loadPdbStructure(combined);
             return structure;
+        },
+
+        async getStructureCompoments(component, chainId1 = 'A', chainId2 = 'B') {
+            const chain1_sel = MS.struct.generator.atomGroups({'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId1])});
+            const chain2_sel = MS.struct.generator.atomGroups({'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId2])});
+
+            const interface1_sel = MS.struct.modifier.intersectBy({
+                0: chain1_sel,
+                by: MS.struct.modifier.includeSurroundings({ 0: chain2_sel, radius: 10, 'as-whole-residues': true })
+            });
+            const interface2_sel = MS.struct.modifier.intersectBy({
+                0: chain2_sel,
+                by: MS.struct.modifier.includeSurroundings({ 0: chain1_sel, radius: 10, 'as-whole-residues': true })
+            });
+            
+            const chain1 = await this.plugin.builders.structure.tryCreateComponentFromExpression(component, chain1_sel, 'A');
+            const chain2 = await this.plugin.builders.structure.tryCreateComponentFromExpression(component, chain2_sel, 'B');
+            const interface1 = await this.plugin.builders.structure.tryCreateComponentFromExpression(component, interface1_sel, 'A-interface');
+            const interface2 = await this.plugin.builders.structure.tryCreateComponentFromExpression(component, interface2_sel, 'B-interface');
+            return { chain1, chain2, interface1, interface2 };
         }
     },
     computed: {
@@ -611,9 +638,18 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
 
         if (this.cluster) {
             await this.loadClusterStructure();
+            const { chain1, chain2, interface1, interface2 } = await this.getStructureCompoments(this.component);
+            this.chain1 = chain1;
+            this.chain2 = chain2;
+            this.interface1 = interface1;
+            this.interface2 = interface2;
+            await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2);
+            this.plugin?.managers.camera.reset();
+
+            if (this.second && this.second !== "") {
+                await this.loadSecondStructure();
+            }
         }
-        // const interfaceMap = getInterfaceResidues(structure, response.data.chain1, response.data.chain2);
-        // this.interfaceMap = interfaceMap;
 
     },
     beforeDestroy() {

@@ -17,6 +17,35 @@ export const skyblue = {
     'hex': '0x88d3e5',
 }
 
+export const lightPurple = {
+    'code': '#d5bee9',
+    'hex': '0xd5bee9', // Softer, lighter complement to your deep purple
+}
+
+export const terracotta = {
+    'code': '#c15c3d',
+    'hex': '0xc15c3d',
+}
+
+export const deepTeal = {
+    'code': '#236d82',
+    'hex': '0x236d82', // Darker, high-contrast complement to your sky blue
+}
+
+export const aquaBlue = {
+    'code': '#00a8d5',
+    'hex': '0x00a8d5'
+}
+
+export const coral = {
+    'code': '#e56b6f',
+    'hex': '0xe56b6f',
+}
+export const softGold = {
+    'code': '#f4d06f',
+    'hex': '0xf4d06f',
+}
+
 export const lightgreen = {
     'code': '#9ED19F',
     'hex': '0x9ED19F',

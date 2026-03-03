@@ -44,7 +44,7 @@ export default {
         links: [
             // { title: "Dark enzymes prediction", href: "https://github.com/jurgjn/af-protein-universe" },
             { title: "Data download", href: "TODO" },
-            { title: "Katja Lab", href: "https://www.imb.de/research/our-research-groups/luck" },
+            { title: "Luck Lab", href: "https://www.imb.de/research/our-research-groups/luck" },
             { title: "Steinegger Lab", href: "https://steineggerlab.com/en/" },
         ]
     }),

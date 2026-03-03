@@ -8,7 +8,7 @@
  */
 import * as d3 from 'd3';
 import * as Colors from './Colors.js';
-import { colors } from 'vuetify/lib/index.js';
+import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder.js';
 
 export function drawStackedBar(svgEl, data, {
     isFraction = true,          // true if values are 0..1
@@ -346,4 +346,25 @@ export function mockPDB(ca, seq) {
         pdb.push(line);
     }
     return pdb.join('\n');
+}
+
+export function getInterfaceExpression(chainExpr1, chainExpr2, radius = 10) {
+    // const chain1 = MS.struct.generator.atomGroups({
+    //     'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId1])
+    // });
+    // const chain2 = MS.struct.generator.atomGroups({
+    //     'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId2])
+    // });
+
+    const interface1 = MS.struct.modifier.intersectBy({
+        0: chainExpr1,
+        by: MS.struct.modifier.includeSurroundings({ 0: chainExpr2, radius, 'as-whole-residues': true })
+    });
+    const interface2 = MS.struct.modifier.intersectBy({
+        0: chainExpr2,
+        by: MS.struct.modifier.includeSurroundings({ 0: chainExpr1, radius, 'as-whole-residues': true })
+    });
+
+    return { interface1, interface2 };
+
 }

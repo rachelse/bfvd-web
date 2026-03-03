@@ -7,7 +7,7 @@ import { StructureRepresentation3D } from 'molstar/lib/mol-plugin-state/transfor
 import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder.js';
 import { canvasToBlob } from 'molstar/lib/mol-canvas3d/util.js';
 import { pulchra } from 'pulchra-wasm';
-import { setChainName, mockPDB } from './Utils.js';
+import { setChainName, mockPDB, getInterfaceExpression } from './Utils.js';
 import * as Colors from './Colors.js';
 
 export class MolstarService {
@@ -71,13 +71,24 @@ export class MolstarService {
         let pdb1 = await pulchra(mockPDB(coordinates1, seq1));
         let pdb2 = await pulchra(mockPDB(coordinates2, seq2));
         
-        pdb1 = setChainName(pdb1, 'A'); // TODO: Change to set proper chain name
+        pdb1 = setChainName(pdb1, 'A');
         pdb2 = setChainName(pdb2, 'B');
         const fullPDB = pdb1 + '\n' + pdb2;
 
+        const chainA = MS.struct.generator.atomGroups({
+            'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'A'])
+        });
+        const chainB = MS.struct.generator.atomGroups({
+            'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'B'])
+        });
+
+        const { interface1, interface2 } = getInterfaceExpression(chainA, chainB);
+
+        const nonInterface1 = MS.struct.modifier.exceptBy({ 0: chainA, by: interface1 });
+        const nonInterface2 = MS.struct.modifier.exceptBy({ 0: chainB, by: interface2 });
+
         // Clear previous structures before drawing new ones
         await this.plugin.clear();
-
         const update = this.plugin.build();
         const root = await update.toRoot()
             .apply(RawData, { data: fullPDB })
@@ -87,23 +98,37 @@ export class MolstarService {
         
         await root
             .apply(StructureSelectionFromExpression, {
-                expression: MS.struct.generator.atomGroups({
-                'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), 'A']),
-                }),
+                expression: interface1,
             })
             .apply(StructureRepresentation3D, {
                 type: { name: 'cartoon', params: {} },
                 colorTheme: { name: 'uniform', params: { value: Colors.purple.hex } },
-            });
+            })
         
         await root
             .apply(StructureSelectionFromExpression, {
-                expression: MS.struct.generator.atomGroups({
-                'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), 'B']),
-                }),
+                expression: interface2,
             })
             .apply(StructureRepresentation3D, {
                 type: { name: 'cartoon', params: {} },
+                colorTheme: { name: 'uniform', params: { value: Colors.skyblue.hex } },
+            })
+        
+        await root
+            .apply(StructureSelectionFromExpression, {
+                expression: nonInterface1,
+            })
+            .apply(StructureRepresentation3D, {
+                type: { name: 'cartoon', params: { alpha: 0.1, transparentBackfaces: 'off' } },
+                colorTheme: { name: 'uniform', params: { value: Colors.purple.hex } },
+            })
+        
+        await root
+            .apply(StructureSelectionFromExpression, {
+                expression: nonInterface2,
+            })
+            .apply(StructureRepresentation3D, {
+                type: { name: 'cartoon', params: { alpha: 0.1, transparentBackfaces: 'off' } },
                 colorTheme: { name: 'uniform', params: { value: Colors.skyblue.hex } },
             })
             .commit();
