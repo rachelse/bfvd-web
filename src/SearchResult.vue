@@ -165,6 +165,7 @@ export default {
         requestOptions() {
             const options = {
                 "queryAccession": this.$route.params.accession,
+                "uniprotAccession": this.$route.params.accession2,
                 "search_type": "accession",
             };
             const obj = Object.assign({}, this.options, options);

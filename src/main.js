@@ -54,7 +54,7 @@ const router = new VueRouter({
     routes: [
         { path: '/', redirect: { name: 'search' } },
         { name: 'search', path: '/', component: Search },
-        { name: 'accession', path: '/accession/:accession', component: Search },
+        { name: 'accession', path: '/accession/:accession/:accession2?', component: Search },
         { name: 'go', path: '/go/:go/:type', component: Search },
         { name: 'lca', path: '/lca/:taxid/:type', component: Search },
         { name: 'foldseek', path: '/foldseek/:jobid', component: Search },

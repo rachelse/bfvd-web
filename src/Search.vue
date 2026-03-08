@@ -40,40 +40,66 @@
                             </v-tabs>
                             <v-tabs-items v-model="tab" style="padding: 1em;">
                                 <v-tab-item>
-                                   <v-text-field
+                                    <div style="max-width: 400px; margin: 0 auto;">
+                                        <div
+                                        v-for="(accession, index) in queryAccessions"
+                                        :key="index"
+                                        style="display: flex; align-items: center; margin-bottom: 8px;"
+                                    >
+                                    <v-text-field
                                         outlined
-                                        label="PDB/UniProt Accession"
-                                        style="max-width: 400px; margin: 0 auto;"
-                                        v-model="queryAccession"
-                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
+                                        :hide-details="index === 0 ? (error == null) : true"
+                                        :label="index === 0 ? 'PDB/UniProt Accession' : 'UniProt Accession'"
+                                        v-model="queryAccessions[index]"
+                                        :append-icon="index === 0 && inSearch ? $MDI.ProgressWrench : index === 0 ? $MDI.Magnify : ''"
                                         :disabled="inSearch"
-                                        @click:append="search"
+                                        @click:append="index === 0 ? search() : null"
                                         @keyup.enter="search"
                                         @change="selectedExample = null"
                                         @keydown="error = null"
-                                        :error="error != null"
-                                        :error-messages="error ? error : []"
+                                        :error="error != null && index === 0"
+                                        :error-messages="error && index === 0 ? error : []"
                                         dark
-                                        >
-                                    </v-text-field>
-                                    
-                                    <template>
-                                        <h2 class="text-h6 mb-2">
-                                            Examples
-                                        </h2>
-                                        <v-chip-group
-                                            column
-                                            dark
-                                            v-model="selectedExample"
-                                            style="max-width: 600px; margin: 0 auto; "
-                                        >
+                                        style="flex: 1;"
+                                    />
 
-                                            <v-chip v-for="item in accessionexamples" :key="item.id"
-                                                outlined v-on:click="queryAccession=item.id" >
-                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
-                                            </v-chip>
-                                        </v-chip-group>
-                                    </template>
+                                    <v-btn
+                                        v-if="index > 0"
+                                        icon
+                                        dark
+                                        @click="queryAccessions.splice(index, 1)"
+                                        style="margin-left: 4px;"
+                                    >
+                                        <v-icon>{{ $MDI.MinusBox }}</v-icon>
+                                    </v-btn>
+                                    </div>
+
+                                    <div v-if="queryAccessions.length < 2 && queryAccessions[0]" style="margin-bottom: 16px; margin-top: 0px">
+                                    <v-btn
+                                        outlined
+                                        dark
+                                        small
+                                        @click="queryAccessions.push('')"
+                                    >
+                                        <v-icon left>{{ $MDI.PlusBox }}</v-icon>
+                                        Add Accession
+                                    </v-btn>
+                                    </div>
+                                </div>
+
+                                <template>
+                                    <h2 class="text-h6 mb-2">Examples</h2>
+                                    <v-chip-group column dark v-model="selectedExample" style="max-width: 600px; margin: 0 auto;">
+                                    <v-chip
+                                        v-for="item in accessionexamples"
+                                        :key="item.id"
+                                        outlined
+                                        v-on:click="queryAccessions = item.id2 ? [item.id, item.id2] : [item.id]"
+                                    >
+                                        <b>{{ item.id }}</b><span v-if="item.id2">&nbsp;-&nbsp;<b>{{ item.id2 }}</b></span> &emsp; {{ item.desc }}
+                                    </v-chip>
+                                    </v-chip-group>
+                                </template>
                                 </v-tab-item>
                                 <!-- <v-tab-item>
                                     <GoAutocomplete
@@ -190,8 +216,6 @@
                     AFDB Clusters is a collaboration between
                     <a href="https://en.snu.ac.kr/">Seoul National University</a> and the
                     <a href="https://www.imb.de/">Institue of Molecular Biology Mainz</a>
-                    <!-- <a href="https://www.ebi.ac.uk/">European Bioinformatics Institute</a>, <br>and the -->
-                    <!-- <a href="https://www.sib.swiss/">Swiss Institute of Bioinformatics</a>. -->
                 </p>
                 <div style="text-align: center; padding-top: 12px; padding-bottom: 40px;">
                     <a style="margin: 12px" rel="external noopener" target="_blank" href="https://en.snu.ac.kr/" height="128">
@@ -232,11 +256,12 @@ export default {
         return {
             tab: 0,
             query: "172289393",
-            queryAccession: "Q8GBB2",
+            queryAccessions: ["Q8GBB2"],
             selectedExample: 1,
             accessionexamples: [ // TODO
                 {id:'Q8GBB2', desc:'tRNA (adenine(58)-N(1))-methyltransferase TrmI'},
                 {id:'6LHT', desc:'TODO'},
+                {id: 'P69924', id2: 'P00452', desc: 'TODO'}
             ],
             intcluexamples: [ // TODO
                 {id: '68503201', desc: 'VIRAL PROTEIN/IMMUNE SYSTEM'},
@@ -281,7 +306,7 @@ export default {
                 this.goSearchType = this.$route.params.type;
             } else if (this.$route.params.accession) {
                 this.tab = 0;
-                this.queryAccession = this.$route.params.accession;
+                this.queryAccessions = [this.$route.params.accession, this.$route.params.accession2].filter(a => a);
             } else if (this.$route.params.taxid) {
                 this.tab = 1;
                 this.queryLCA = {text: "" + this.$route.params.taxid, value: this.$route.params.taxid};
@@ -293,38 +318,24 @@ export default {
             }
         },
         search() {
-            // if (!this.query) {
-            //     return;
-            // }
-            // this.inSearch = true;
-            // this.error = null;
-            // this.$axios.get("/" + this.query)
-            //     .then(response => {
-            //         this.$router.push({ name: 'cluster', params: { cluster: response.data[0].intclu_rep_accession } })
-            //     })
-            //     .catch((err) => {
-            //         if (err.response && err.response.data && err.response.data.error) {
-            //             this.error = err.response.data.error;
-            //         } else {
-            //             this.error = "Unknown error";
-            //         }
-            //     })
-            //     .finally(() => {
-            //         this.inSearch = false;
-            //     });
-
-            const accession = (this.queryAccession || "").trim();
-            if (!accession) return;
+            const accessions = this.queryAccessions
+                .map(a => (a || "").trim())
+                .filter(a => a);
+            
+            if (!accessions.length || accessions.length > 2) return;
 
             this.inSearch = true;
             this.error = null;
-
-            this.$axios
-                .get("/" + encodeURIComponent(accession))
+            Promise.all(
+                accessions.map(acc => this.$axios.get("/" + encodeURIComponent(acc)))
+            )
                 .then((res) => {
                     return this.$router.push({
                         name: "accession",
-                        params: { accession }
+                        params: { 
+                            accession: accessions[0],
+                            accession2: accessions[1] ? accessions[1] : undefined
+                        }
                     });
                 })
                 .catch((err) => {

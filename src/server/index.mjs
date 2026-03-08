@@ -158,6 +158,26 @@ function finalizeResult(result, req, res) {
 }
 
 app.get('/api/search/accession{/:taxonomy}', async (req, res) => {
+    let acc1 = req.query.queryAccession;
+    let acc2 = req.query.uniprotAccession?.trim().toUpperCase() || null;
+    const isPDB = /^[A-Za-z0-9]{4}$/.test(acc1);
+    const isUniProt = /^[A-Za-z0-9]{6,10}$/.test(acc1);
+    let result;
+
+    if (isPDB) {
+        acc1 = acc1.toLowerCase();
+    } else if (isUniProt) {
+        acc1 = acc1.toUpperCase();
+    } else {
+        res.status(400).send({ error: "First accession is not a valid PDB ID or UniProt ID" });
+        return;
+    }
+
+    if (acc2 && !/^[A-Za-z0-9]{6,10}$/.test(acc2)) {
+        res.status(400).send({ error: "Second accession is not a valid UniProt ID" });
+        return;
+    }
+
     let filter_params = [];
     if (req.query.n_mem_range) {
         const split = req.query.n_mem_range.split(',');
@@ -168,46 +188,41 @@ app.get('/api/search/accession{/:taxonomy}', async (req, res) => {
         filter_params.push('INF');
     }
 
+    let accessions_where = "";
+    let accession_params = [];
+    if (isPDB && acc2) {
+        accessions_where = `(m.pdb_id = ? AND (m.uniprot_id1 = ? OR m.uniprot_id2 = ?))`;
+        accession_params.push(acc1, acc2, acc2);
+    } else if (isPDB) {
+        accessions_where = `m.pdb_id = ?`;
+        accession_params.push(acc1);
+    } else if (isUniProt && acc2) {
+        accessions_where = `(m.uniprot_id1 = ? AND m.uniprot_id2 = ?) OR (m.uniprot_id1 = ? AND m.uniprot_id2 = ?)`;
+        accession_params.push(acc1, acc2, acc2, acc1);
+    } else if (isUniProt) {
+        accessions_where = `(m.uniprot_id1 = ? OR m.uniprot_id2 = ?)`;
+        accession_params.push(acc1, acc1);
+    }
+
     let queries_where = [];
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
 
-    let acc = req.query.queryAccession;
-    const isPDB = /^[A-Za-z0-9]{4}$/.test(acc);
-    const isUniProt = /^[A-Za-z0-9]{6,10}$/.test(acc);
-    let result;
-
-    if (isPDB) {
-        acc = acc?.toLowerCase();
-        result = await sql.all(`
-            WITH reps AS (
-                SELECT DISTINCT m.intclu_rep_accession AS rep
-                FROM member AS m
-                WHERE (m.pdb_id = ?)
-                AND m.intclu_rep_accession IS NOT NULL
-            )
-            SELECT m.*, c.*
-            FROM reps
-            JOIN cluster c ON c.intclu_rep_accession = reps.rep
-            JOIN member  m ON m.intclu_rep_accession = reps.rep
-            WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
-            `, acc, ...filter_params);
-    } else if (isUniProt) {
-        acc = acc?.toUpperCase();
-        result = await sql.all(`
-            WITH reps AS (
-                SELECT DISTINCT m.intclu_rep_accession AS rep
-                FROM member AS m
-                WHERE (m.uniprot_id1 = ? OR m.uniprot_id2 = ?)
-                AND m.intclu_rep_accession IS NOT NULL
-            )
-            SELECT m.*, c.*
-            FROM reps
-            JOIN cluster c ON c.intclu_rep_accession = reps.rep
-            JOIN member  m ON m.intclu_rep_accession = reps.rep
-            WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
-            `, acc, acc, ...filter_params);
-    } else {
-        res.status(400).send({ error: "Invalid accession format" });
+    result = await sql.all(`
+        WITH reps AS (
+            SELECT DISTINCT m.intclu_rep_accession AS rep
+            FROM member AS m
+            WHERE ${accessions_where}
+            AND m.intclu_rep_accession IS NOT NULL
+        )
+        SELECT m.*, c.*
+        FROM reps
+        JOIN cluster c ON c.intclu_rep_accession = reps.rep
+        JOIN member  m ON m.intclu_rep_accession = reps.rep
+        WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
+        `, ...accession_params, ...filter_params);
+    
+    if (result.length == 0) {
+        res.status(404).send({ error: "No results found" });
         return;
     }
 

@@ -1,12 +1,3 @@
-/*
- * File: Colors.js
- * Project: interface_clusters
- * File Created: 15th Feb 2026
- * Author: Rachel Seongeun Kim (seamustard52@gmail.com)
- * -----
- * Copyright: Rachel Seongeun Kim
- */
-
 export const purple = {
     'code': '#7f2a61',
     'hex': '0x7f2a61',

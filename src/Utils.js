@@ -1,11 +1,3 @@
-/*
- * File: Utils.js
- * Project: interface_clusters
- * File Created: 12th Feb 2026
- * Author: Rachel Seongeun Kim (seamustard52@gmail.com)
- * -----
- * Copyright: Rachel Seongeun Kim
- */
 import * as d3 from 'd3';
 import * as Colors from './Colors.js';
 import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder.js';
