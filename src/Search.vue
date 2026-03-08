@@ -32,50 +32,14 @@
                                 background-color="transparent"
                                 dark
                             >
-                                <v-tab>UniProt</v-tab>
                                 <v-tab>PDB</v-tab>
+                                <v-tab>UniProt</v-tab>
                                 <!-- <v-tab>Gene Ontology</v-tab> -->
                                 <v-tab>Taxonomy</v-tab>
                                 <v-tab>Structure</v-tab>
                                 <v-tab>Cluster ID</v-tab>
                             </v-tabs>
                             <v-tabs-items v-model="tab" style="padding: 1em;">
-                                <v-tab-item>
-                                    <v-text-field
-                                        outlined
-                                        label="UniProt accession"
-                                        style="max-width: 400px; margin: 0 auto;"
-                                        v-model="queryUniProt"
-                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
-                                        :disabled="inSearch"
-                                        @click:append="searchUniProt"
-                                        @keyup.enter="searchUniProt"
-                                        @change="selectedExample = null"
-                                        @keydown="error = null"
-                                        :error="error != null"
-                                        :error-messages="error ? error : []"
-                                        dark
-                                        >
-                                    </v-text-field>
-                                    
-                                    <template>
-                                        <h2 class="text-h6 mb-2">
-                                            Examples
-                                        </h2>
-                                        <v-chip-group
-                                            column
-                                            dark
-                                            v-model="selectedExample"
-                                            style="max-width: 600px; margin: 0 auto; "
-                                        >
-
-                                            <v-chip v-for="item in uniprotexamples" :key="item.id"
-                                                outlined v-on:click="queryUniProt=item.id" >
-                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
-                                            </v-chip>
-                                        </v-chip-group>
-                                    </template>
-                                </v-tab-item>
                                 <v-tab-item>
                                    <v-text-field
                                         outlined
@@ -107,6 +71,42 @@
 
                                             <v-chip v-for="item in pdbexamples" :key="item.id"
                                                 outlined v-on:click="queryPDB=item.id" >
+                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
+                                            </v-chip>
+                                        </v-chip-group>
+                                    </template>
+                                </v-tab-item>
+                                <v-tab-item>
+                                    <v-text-field
+                                        outlined
+                                        label="UniProt accession"
+                                        style="max-width: 400px; margin: 0 auto;"
+                                        v-model="queryUniProt"
+                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
+                                        :disabled="inSearch"
+                                        @click:append="searchUniProt"
+                                        @keyup.enter="searchUniProt"
+                                        @change="selectedExample = null"
+                                        @keydown="error = null"
+                                        :error="error != null"
+                                        :error-messages="error ? error : []"
+                                        dark
+                                        >
+                                    </v-text-field>
+                                    
+                                    <template>
+                                        <h2 class="text-h6 mb-2">
+                                            Examples
+                                        </h2>
+                                        <v-chip-group
+                                            column
+                                            dark
+                                            v-model="selectedExample"
+                                            style="max-width: 600px; margin: 0 auto; "
+                                        >
+
+                                            <v-chip v-for="item in uniprotexamples" :key="item.id"
+                                                outlined v-on:click="queryUniProt=item.id" >
                                                 <b>{{ item.id }}</b> &emsp; {{ item.desc }}
                                             </v-chip>
                                         </v-chip-group>
@@ -201,8 +201,8 @@
                     </v-row>
                 </v-parallax>
             </v-flex>
-            <UniProtSearchResult v-if="tab == 0" @total="small = $event > 0; inSearch = false;"></UniProtSearchResult>
-            <PDBSearchResult v-else-if="tab == 1" @total="small = $event > 0; inSearch = false;"></PDBSearchResult>
+            <PDBSearchResult v-if="tab == 0" @total="small = $event > 0; inSearch = false;"></PDBSearchResult>
+            <UniProtSearchResult v-else-if="tab == 1" @total="small = $event > 0; inSearch = false;"></UniProtSearchResult>
             <!-- <GoSearchResult v-else-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult> -->
             <LCASearchResult v-else-if="tab == 2" @total="small = $event > 0; inSearch = false;"></LCASearchResult>
             <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult>
@@ -323,10 +323,10 @@ export default {
                 this.queryGo = { text: "" + this.$route.params.go, value: this.$route.params.go};
                 this.goSearchType = this.$route.params.type;
             } else if (this.$route.params.accession) {
-                this.tab = 0;
+                this.tab = 1;
                 this.queryUniProt = this.$route.params.accession; 
             } else if (this.$route.params.entry) {
-                this.tab = 1;
+                this.tab = 0;
                 this.queryPDB = this.$route.params.entry.toLowerCase();
             } else if (this.$route.params.taxid) {
                 this.tab = 2;
