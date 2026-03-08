@@ -4,7 +4,8 @@
         <template v-slot:header>
             Cluster selection
             <template v-if="$route.params.jobid">
-                for <a :href="'https://search.foldseek.com/result/' + $route.params.jobid + '/0'" target="_blank" rel="noopener">{{ $route.params.jobid }}</a>
+                <!-- for <a :href="'https://search.foldseek.com/result/' + $route.params.jobid + '/0'" target="_blank" rel="noopener">{{ $route.params.jobid }}</a> -->
+                for <a :href="'http://localhost:8081/result/' + $route.params.jobid + '/0'" target="_blank" rel="noopener">{{ $route.params.jobid }}</a>
             </template>
         </template>
     
@@ -53,7 +54,7 @@
                 <template v-slot:header.lca_tax_id="{ header }"> 
                     <TaxonomyAutocomplete
                         v-model="options.tax_id"
-                        :urlFunction="(_, b) => '/search/pdb/' + b"
+                        :urlFunction="(_, b) => '/search/foldseek/' + b"
                         :disabled="taxAutocompleteDisabled"
                         :options="requestOptions"
                     ></TaxonomyAutocomplete>

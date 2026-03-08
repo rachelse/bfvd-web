@@ -50,7 +50,7 @@
             <template v-slot:header.lca_tax_id="{ header }"> 
                 <TaxonomyAutocomplete
                     v-model="options.tax_id"
-                    :urlFunction="(_, b) => '/search/uniprot/' + b"
+                    :urlFunction="(_, b) => '/search/accession/' + b"
                     :disabled="taxAutocompleteDisabled"
                     :options="requestOptions"
                 ></TaxonomyAutocomplete>
@@ -88,7 +88,7 @@ import ExternalLinks from "./ExternalLinks.vue";
 import ImageMixin from "./ImageMixin";
 
 export default {
-    name: "uniprotsearchresult",
+    name: "searchresult",
     components: { 
         Panel,
         TaxSpan,
@@ -164,8 +164,8 @@ export default {
     computed: {
         requestOptions() {
             const options = {
-                "query_UniProt": this.$route.params.accession,
-                "search_type": "uniprot",
+                "queryAccession": this.$route.params.accession,
+                "search_type": "accession",
             };
             const obj = Object.assign({}, this.options, options);
             let copy = JSON.parse(JSON.stringify(obj));
@@ -190,7 +190,7 @@ export default {
             }
 
             this.loading = true;
-            this.$axios.get("/search/uniprot", this.requestOptions)
+            this.$axios.get("/search/accession", this.requestOptions)
                 .then(response => {
                     this.response = response.data.result;
                     this.total = response.data.total;

@@ -157,7 +157,7 @@ function finalizeResult(result, req, res) {
     return;
 }
 
-app.get('/api/search/uniprot{/:taxonomy}', async (req, res) => {
+app.get('/api/search/accession{/:taxonomy}', async (req, res) => {
     let filter_params = [];
     if (req.query.n_mem_range) {
         const split = req.query.n_mem_range.split(',');
@@ -170,67 +170,47 @@ app.get('/api/search/uniprot{/:taxonomy}', async (req, res) => {
 
     let queries_where = [];
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    
-    const accession = req.query.query_UniProt;
-    let result = await sql.all(`
-    WITH reps AS (
-        SELECT DISTINCT m.intclu_rep_accession AS rep
-        FROM member AS m
-        WHERE (m.uniprot_id1 = ? OR m.uniprot_id2 = ?)
-        AND m.intclu_rep_accession IS NOT NULL
-    )
-    SELECT m.*, c.*
-    FROM reps
-    JOIN cluster c ON c.intclu_rep_accession = reps.rep
-    JOIN member  m ON m.intclu_rep_accession = reps.rep
-    WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
-    `, accession, accession, ...filter_params);
-    result.forEach((x) => {
-        if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
-            x.uniprot_id1 = null;
-        }
-        if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
-            x.uniprot_id2 = null;
-        }
-    });
 
-    if (!result || result.length == 0) {
-        res.status(404).send({ error: "No cluster found" });
+    let acc = req.query.queryAccession;
+    const isPDB = /^[A-Za-z0-9]{4}$/.test(acc);
+    const isUniProt = /^[A-Za-z0-9]{6,10}$/.test(acc);
+    let result;
+
+    if (isPDB) {
+        acc = acc?.toLowerCase();
+        result = await sql.all(`
+            WITH reps AS (
+                SELECT DISTINCT m.intclu_rep_accession AS rep
+                FROM member AS m
+                WHERE (m.pdb_id = ?)
+                AND m.intclu_rep_accession IS NOT NULL
+            )
+            SELECT m.*, c.*
+            FROM reps
+            JOIN cluster c ON c.intclu_rep_accession = reps.rep
+            JOIN member  m ON m.intclu_rep_accession = reps.rep
+            WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
+            `, acc, ...filter_params);
+    } else if (isUniProt) {
+        acc = acc?.toUpperCase();
+        result = await sql.all(`
+            WITH reps AS (
+                SELECT DISTINCT m.intclu_rep_accession AS rep
+                FROM member AS m
+                WHERE (m.uniprot_id1 = ? OR m.uniprot_id2 = ?)
+                AND m.intclu_rep_accession IS NOT NULL
+            )
+            SELECT m.*, c.*
+            FROM reps
+            JOIN cluster c ON c.intclu_rep_accession = reps.rep
+            JOIN member  m ON m.intclu_rep_accession = reps.rep
+            WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
+            `, acc, acc, ...filter_params);
+    } else {
+        res.status(400).send({ error: "Invalid accession format" });
         return;
     }
-    return finalizeResult(result, req, res);
-});
 
-app.get('/api/search/pdb{/:taxonomy}', async (req, res) => {
-    
-    
-    let filter_params = [];
-    if (req.query.n_mem_range) {
-        const split = req.query.n_mem_range.split(',');
-        filter_params.push(split[0] ?? '0');
-        filter_params.push(split[1] ?? 'INF');
-    } else {
-        filter_params.push('0');
-        filter_params.push('INF');
-    }
-
-    let queries_where = [];
-    queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-
-    const entry = req.query.query_PDB;
-    let result = await sql.all(`
-        WITH reps AS (
-            SELECT DISTINCT m.intclu_rep_accession AS rep
-            FROM member AS m
-            WHERE (m.pdb_id = ?)
-            AND m.intclu_rep_accession IS NOT NULL
-        )
-        SELECT m.*, c.*
-        FROM reps
-        JOIN cluster c ON c.intclu_rep_accession = reps.rep
-        JOIN member  m ON m.intclu_rep_accession = reps.rep
-        WHERE m.accession == m.intclu_rep_accession AND ${queries_where.join(" AND ")}
-        `, entry, ...filter_params);
     result.forEach((x) => {
         if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
             x.uniprot_id1 = null;
@@ -424,17 +404,20 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
 });
 
 app.get('/api/:query', async (req, res) => {
-    let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.uniprot_id1 = ? OR m.uniprot_id2 = ?", req.params.query, req.params.query);
-    if (!result) {
-        res.status(404).send({ error: "No cluster found" });
-        return;
-    }
-    result.lca_tax_id = tree.nodeExists(result.lca_tax_id) ? tree.getNode(result.lca_tax_id) : null;
-    res.send([ result ]);
-});
+    let acc = req.params.query;
+    // Check if query is a PDB ID (4 characters, alphanumeric) or a UniProt ID (alphanumeric characters)
+    const isPDBID = /^[A-Za-z0-9]{4}$/.test(req.params.query);
+    const isUniProtID = /^[A-Za-z0-9]{6,10}$/.test(req.params.query);
+    let result;
 
-app.get('/api/pdbid/:pdbid', async (req, res) => {
-    let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.pdb_id = ?", req.params.pdbid);
+    if (isPDBID) {
+        acc = acc?.toLowerCase();
+        result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.pdb_id = ?", acc);
+    } else if (isUniProtID) {
+        acc = acc?.toUpperCase();
+        result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.intclu_rep_accession == c.intclu_rep_accession WHERE m.uniprot_id1 = ? OR m.uniprot_id2 = ?", acc, acc);
+    }
+
     if (!result) {
         res.status(404).send({ error: "No cluster found" });
         return;
