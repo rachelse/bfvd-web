@@ -94,22 +94,26 @@
         <template v-if="second">
             <span v-if="secondComponent == null">Superposition loading</span>
             <template v-else>
-                <div class="d-flex align-center">
-                    <span style="position: relative; display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center;" class="mr-1">
-                        <v-icon :color="seccol1.code" size="small" style="position: absolute;">
-                        {{ $MDI.CircleHalf }} </v-icon><v-icon :color="seccol2.code" size="small" style="position: absolute; transform: scaleX(-1);">
-                        {{ $MDI.CircleHalf }} </v-icon>
+                <div class="d-flex align-center" style="flex-wrap: wrap; gap: 4px;">
+                    <span class="d-inline-flex align-center" style="white-space: nowrap;">
+                        <span style="position: relative; display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center;" class="mr-1">
+                            <v-icon :color="seccol1.code" size="small" style="position: absolute;">
+                            {{ $MDI.CircleHalf }} </v-icon><v-icon :color="seccol2.code" size="small" style="position: absolute; transform: scaleX(-1);">
+                            {{ $MDI.CircleHalf }} </v-icon>
+                        </span>
+                        <span>{{ second }}</span>
                     </span>
-                        <span>{{ second }}</span> 
-                        &nbsp;superposed on representative&nbsp;
-                    <span style="position: relative; display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center;" class="mr-1">
-                        <v-icon :color="col1.code" size="small" style="position: absolute;">
-                            {{ $MDI.CircleHalf }} 
-                        </v-icon><v-icon :color="col2.code" size="small" style="position: absolute; transform: scaleX(-1);">
-                            {{ $MDI.CircleHalf }} 
-                        </v-icon>
+                    <span style="white-space: nowrap;">superposed on representative</span>
+                    <span class="d-inline-flex align-center" style="white-space: nowrap;">
+                        <span style="position: relative; display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center;" class="mr-1">
+                            <v-icon :color="col1.code" size="small" style="position: absolute;">
+                                {{ $MDI.CircleHalf }} 
+                            </v-icon><v-icon :color="col2.code" size="small" style="position: absolute; transform: scaleX(-1);">
+                                {{ $MDI.CircleHalf }} 
+                            </v-icon>
+                        </span>
+                        <span>{{ cluster }}</span>
                     </span>
-                    <span>{{ cluster }}</span>
                 </div>
                 <template v-if="tmOutput">
                     <span><strong>TM-score:</strong>&nbsp; {{ tmOutput.tmScore.toFixed(2) }}</span>&nbsp;
