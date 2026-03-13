@@ -84,8 +84,8 @@
                     v-on:click="updateStructureMode()"
                     title="Switch between showing only the interface, highlighting the interface, or showing the whole structure"
                 >
-                    <v-icon v-bind="tbIconBindings">{{ structureMode == 0 ? $MDI.CircleHalf : (structureMode == 1 ? $MDI.Circle : $MDI.CircleOpacity) }}</v-icon>
-                    <span v-if="isFullscreen">&nbsp;{{ structureMode == 0 ? 'Only Interface' : (structureMode == 1 ? 'Whole Structure' : 'Highlight Interface') }}</span>
+                    <v-icon v-bind="tbIconBindings">{{ structureMode == 0 ? $MDI.CircleOpacity : (structureMode == 1 ? $MDI.CircleHalf : $MDI.Circle) }}</v-icon>
+                    <span v-if="isFullscreen">&nbsp;{{ structureMode == 0 ? 'Highlight Interface' : (structureMode == 1 ? 'Only Interface' : 'Whole Structure') }}</span>
                 </v-btn>
                 </v-item-group>
             </div>
@@ -128,14 +128,10 @@
 import { createPluginUI } from 'molstar/lib/mol-plugin-ui/index.js';
 import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18.js';
 import { DefaultPluginUISpec } from 'molstar/lib/mol-plugin-ui/spec.js';
-import { Vec3 } from 'molstar/lib/mol-math/linear-algebra';
-import { Segmentation } from 'molstar/lib/mol-data/int';
-import { StructureSelection, QueryContext, StructureElement, StructureProperties as SP } from 'molstar/lib/mol-model/structure';
+import {  Structure, StructureElement, StructureProperties as SP } from 'molstar/lib/mol-model/structure';
 import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder';
-import { compile } from 'molstar/lib/mol-script/runtime/query/compiler';
 import { StateTransforms } from 'molstar/lib/mol-plugin-state/transforms';
 import { Mat4 } from 'molstar/lib/mol-math/linear-algebra.js';
-import { isProtein } from 'molstar/lib/mol-model/structure/model/types';
 
 import Panel from './Panel.vue';
 import { pulchra } from 'pulchra-wasm';
@@ -189,109 +185,51 @@ function generatePdbAtoms(structureData) {
     return atomLines.join('\n');
 }
 
-async function addStructureRepresentation(plugin, color1, color2, main1, main2, transparent1 = null, transparent2 = null) {
+function markComponentCluster(component, clusterId) {
+    const structure = component?.obj?.data;
+    if (!structure) return;
+
+    structure.ClusterId = clusterId;
+
+    // Loci can point to derived sub-structures, but unit.model is often shared.
+    for (const unit of structure.units || []) {
+        if (unit?.model) unit.model.ClusterId = clusterId;
+    }
+}
+
+async function addStructureRepresentation(
+    plugin, color1, color2, main1, main2, 
+    transparent1 = null, transparent2 = null, clusterId = ''
+) {
+    const clusterTag = clusterId;
+    const chain1Tag = `${clusterTag}-chain1-ui`;
+    const chain2Tag = `${clusterTag}-chain2-ui`;
+
+    markComponentCluster(main1, clusterId);
+    markComponentCluster(main2, clusterId);
+    markComponentCluster(transparent1, clusterId);
+    markComponentCluster(transparent2, clusterId);
+
     if (transparent1) {
         await plugin.builders.structure.representation.addRepresentation(transparent1, {
-            type: 'cartoon', color: 'uniform', colorParams: { value: 0xFFFFFF /* color1*/ },
-            typeParams: { alpha: 0.3, transparentBackfaces: 'off' },
-        }, { tag: 'chain-1-ui' });
+            type: 'cartoon', color: 'uniform', colorParams: { value: color1 },
+            typeParams: { alpha: 0.2, transparentBackfaces: 'off' },
+        }, { tag: chain1Tag });
     }
 
     if (transparent2) {
         await plugin.builders.structure.representation.addRepresentation(transparent2, {
-            type: 'cartoon', color: 'uniform', colorParams: { value: 0xFFFFFF /* color2*/ },
-            typeParams: { alpha: 0.3, transparentBackfaces: 'off' },
-        }, { tag: 'chain-2-ui' });
+            type: 'cartoon', color: 'uniform', colorParams: { value: color2 },
+            typeParams: { alpha: 0.2, transparentBackfaces: 'off' },
+        }, { tag: chain2Tag });
     }
 
     await plugin.builders.structure.representation.addRepresentation(main1, {
         type: 'cartoon', color: 'uniform', colorParams: { value: color1 },
-    }, { tag: 'chain-1-ui' });
+    }, { tag: chain1Tag });
     await plugin.builders.structure.representation.addRepresentation(main2, {
         type: 'cartoon', color: 'uniform', colorParams: { value: color2 },
-    }, { tag: 'chain-2-ui' });
-}
-
-function getCAPositions(unit) {
-    const { elements, model } = unit;
-    const { chainAtomSegments, residueAtomSegments, atoms } = model.atomicHierarchy;
-
-    const atomId = atoms.label_atom_id;
-
-    const chainIt = Segmentation.transientSegments(chainAtomSegments, elements);
-    const residueIt = Segmentation.transientSegments(residueAtomSegments, elements);
-
-    const caUnitIndex = [];
-
-    while (chainIt.hasNext) {
-        const chainSeg = chainIt.move();
-        residueIt.setSegment(chainSeg);
-
-        while (residueIt.hasNext) {
-            const r = residueIt.move();
-            let found = -1;
-
-            for (let ui = r.start; ui < r.end; ui++) {
-                const e = elements[ui];
-                if (atomId.value(e) === 'CA') { found = ui; break;}
-            }
-
-            caUnitIndex.push(found);
-        }
-    }
-    return caUnitIndex;
-}
-
-async function getInterfaceResidues(structure, chain1, chain2, thresholdSq = 10.0 * 10.0) {
-    let { units } = structure.data;
-    units = units.filter(unit => { // Make sure we only have protein chains
-        return isProtein(unit.model.atomicHierarchy.derived.residue.moleculeType[0]);
-    });
-    
-    if (units.length < 2) {
-        console.warn("Structure does not have two chains for interface detection.");
-        return;
-    }
-
-    const u1 = units[0];
-    const u2 = units[1];
-
-    const caQuery1 = compile(MS.struct.generator.atomGroups({
-        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'A']),
-        'atom-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.label_atom_id(), 'CA'])
-    }));
-    const structuredata = structure.obj.data;
-    const sel1 = StructureSelection.toLociWithCurrentUnits(caQuery1(new QueryContext(structuredata)));
-    const caloci1 = StructureElement.Loci.is(sel1) ? sel1 : StructureElement.Loci.none(structuredata);
-
-    const caQuery2 = compile(MS.struct.generator.atomGroups({
-        'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chain2]),
-        'atom-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.label_atom_id(), 'CA'])
-    }));
-    const sel2 = StructureSelection.toLociWithCurrentUnits(caQuery2(new QueryContext(structuredata)));
-    const caloci2 = StructureElement.Loci.is(sel2) ? sel2 : StructureElement.Loci.none(structuredata);
-    
-    const interfaceResidues1 = new Set();
-    const interfaceResidues2 = new Set();
-    const v1 = Vec3();
-    const v2 = Vec3();
-
-    for (let i = 0; i < caloci1.elements[0].indices.length; i++) {
-        const e1 = caloci1.elements[0].indices[i];
-        u1.conformation.position(u1.elements[e1], v1);
-        for (let j = 0; j < caloci2.elements[0].indices.length; j++) {
-            const e2 = caloci2.elements[0].indices[j];
-
-            u2.conformation.position(u2.elements[e2], v2);
-            const d2 = Vec3.squaredDistance(v1, v2);
-            if (d2 < thresholdSq) {
-                interfaceResidues1.add(i);
-                interfaceResidues2.add(j);
-            }
-        }
-    }
-    
-    return { interfaceResidues1, interfaceResidues2 };
+    }, { tag: chain2Tag });
 }
 
 export default {
@@ -309,6 +247,8 @@ export default {
         secondChain2: null,
         secondInterface1: null,
         secondInterface2: null,
+        clusterChainName: {},
+        secondChainName: {},
         'isFullscreen': false,
         'hovered': false,
         col1: Colors.purple,
@@ -325,10 +265,48 @@ export default {
         'bgColorDark': { type: String, default: Colors.black.hex },
     },
     methods: {
+        resolveLociClusterId(loci) {
+            if (!StructureElement.Loci.is(loci)) return '';
+
+            const s = loci.structure;
+            return (
+                s?.ClusterId ||
+                s?.units?.[0]?.model?.ClusterId ||
+                ''
+            );
+        },
+
+        resolveOriginalChain(clusterId, chainId) {
+            const map = clusterId === this.second ? this.secondChainName : this.clusterChainName;
+            return map?.[chainId] || chainId;
+        },
+
+        buildLociLabel(loci, clusterId = '') {
+            if (!StructureElement.Loci.is(loci)) return;
+
+            const l = StructureElement.Location.create(loci.structure);
+            StructureElement.Loci.getFirstLocation(loci, l);
+
+            const chainId = SP.chain.auth_asym_id(l);
+            const resName = SP.residue.label_comp_id(l);
+            const resNum = SP.residue.auth_seq_id(l);
+            const originalChainId = this.resolveOriginalChain(clusterId, chainId);
+
+            const prefix = clusterId ? `${clusterId} | ` : '';
+            return `${prefix}Chain ${originalChainId} | ${resName} ${resNum}`;
+        },
+
         async initMolstar() {
             const bgColor = this.$vuetify.theme.dark ? this.bgColorDark : this.bgColorLight;
+            const defaultSpec = DefaultPluginUISpec();
+            const customBehaviors = defaultSpec.behaviors.filter(b =>
+                [
+                    'ms-plugin.camera-focus-loci', 'ms-plugin.representation-highlight-loci',
+                    'ms-plugin.structure-info-prop'
+                ].includes(b.transformer.id)
+            );
             const spec = {
-                ...DefaultPluginUISpec(),
+                ...defaultSpec,
                 layout: {
                     initial: {
                         showControls: false,
@@ -338,9 +316,20 @@ export default {
                 canvas3d: {
                     renderer: {
                         transparentBackground: true,
-                        backgroundColor: bgColor 
+                        backgroundColor: bgColor,
+                        pickingAlphaThreshold: 0.1, 
                     },
-                }
+                    camera: {
+                        helper: { axes: {name: 'off', params: {}}},
+                        fov: 60,
+                    },
+                    cameraClipping: {
+                        radius: 0,
+                        far: false,
+                        minNear: -1000,
+                    },
+                },
+                behaviors: customBehaviors,
             };
 
             this.plugin = await createPluginUI({
@@ -348,9 +337,17 @@ export default {
                 spec,
                 render: renderReact18
             });
+            this.plugin.managers.lociLabels.addProvider({
+                label: (loci) => {
+                    const clusterId = this.resolveLociClusterId(loci);
+                    return this.buildLociLabel(loci, clusterId);
+                },
+                group: (label) => label,
+                priority: 100,
+            });
         },
 
-        async loadPdbStructure(pdbString, colorHex = null) {
+        async loadPdbStructure(pdbString) {
             const data = await this.plugin.builders.data.rawData({ data: pdbString });
             const trajectory = await this.plugin.builders.structure.parseTrajectory(data, 'pdb');
             const model = await this.plugin.builders.structure.createModel(trajectory);
@@ -368,12 +365,12 @@ export default {
                 const response = await this.$axios.get("/chainid/" + this.cluster);
                 if (!response || !response.data) return;
 
-                const structure = await this.fetchDimerStructure(
-                    response.data.chain1_id, 
-                    response.data.chain2_id, 
-                    response.data.chain1, 
-                    response.data.chain2
-                );
+                const structure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id);
+
+                this.clusterChainName = {
+                    A: response.data.chain1,
+                    B: response.data.chain2,
+                };
                 
                 this.component = structure;
             } catch (error) {
@@ -392,12 +389,14 @@ export default {
             try {
                 const response = await this.$axios.get("/chainid/" + this.second);
                 if (!response || !response.data) return;
-                const secondStructure = await this.fetchDimerStructure(
-                    response.data.chain1_id, response.data.chain2_id, response.data.chain1, response.data.chain2
-                );
+                const secondStructure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id);
+                this.secondChainName = {
+                    A: response.data.chain1,
+                    B: response.data.chain2,
+                };
                 this.secondComponent = secondStructure;
 
-                const { chain1, chain2, interface1, interface2 } = await this.getStructureCompoments(secondStructure);
+                const { chain1, chain2, interface1, interface2 } = await this.getStructureComponents(secondStructure);
                 this.secondChain1 = chain1;
                 this.secondChain2 = chain2;
                 this.secondInterface1 = interface1;
@@ -428,14 +427,13 @@ export default {
                     .commit();
 
                 if (this.structureMode === 0) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2);
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2, chain1, chain2, this.second);
+                    this.focusInterface();
                 } else if (this.structureMode === 1) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2);
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2, null, null, this.second);
                 } else if (this.structureMode === 2) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, chain1, chain2);
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, chain1, chain2, null, null, this.second);
                 }
-                // await this.plugin.builders.structure.representation.applyPreset(this.secondComponent, 'auto');
-                this.plugin?.managers.camera.reset();
             } catch (error) {
                 console.error("Error loading second structure:", error);
             }
@@ -448,7 +446,20 @@ export default {
                 this.secondComponent = null;
                 this.$emit('reset', null);
             }
-            this.plugin?.managers.camera.reset();
+
+            if (this.structureMode === 0) {
+                this.focusInterface();
+            } else {
+                this.plugin?.managers.camera.reset();
+            }
+        },
+
+        async focusInterface() {
+            if (!this.plugin) return;
+            const loci1 = Structure.toStructureElementLoci(this.interface1.obj.data);
+            const loci2 = Structure.toStructureElementLoci(this.interface2.obj.data);
+            const combinedLoci = StructureElement.Loci.union(loci1, loci2);
+            this.plugin?.managers.camera.focusLoci(combinedLoci, true);
         },
 
         async makeImage() {
@@ -526,7 +537,9 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
                 const cellsToDelete = allCells.filter(cell => {
                     const tags = cell.transform?.tags;
                     return Array.isArray(tags) && (
-                        tags.includes('chain-1-ui') || tags.includes('chain-2-ui')
+                        tags.includes(`${this.cluster}-chain1-ui`) ||
+                        tags.includes(`${this.cluster}-chain2-ui`) ||
+                        (this.second && (tags.includes(`${this.second}-chain1-ui`) || tags.includes(`${this.second}-chain2-ui`)))
                     );
                 });
                 const update = this.plugin.build();
@@ -537,25 +550,30 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
             }
             if ( this.structureMode === 0) {
                 // Default: Show whole structure (transparent) with interface highlighted
-                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2);
+                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2, this.cluster);
             } else if (this.structureMode === 1) {
                 // Show only interface
-                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2);
+                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, null, null, this.cluster);
             } else if (this.structureMode === 2) {
                 // Show whole structure
-                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.chain1, this.chain2);
+                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.chain1, this.chain2, null, null, this.cluster);
             }
 
             if (this.secondComponent) {
                 if ( this.structureMode === 0) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2, this.secondChain1, this.secondChain2);
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2, this.secondChain1, this.secondChain2, this.second);
                 } else if (this.structureMode === 1) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2);
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2, null, null, this.second);
                 } else if (this.structureMode === 2) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondChain1, this.secondChain2);
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondChain1, this.secondChain2, null, null, this.second);
                 }
             }
-            this.plugin?.managers.camera.reset();
+
+            if ( this.structureMode === 0 || this.structureMode === 1) {
+                this.focusInterface();
+            } else {
+                this.plugin?.managers.camera.reset();
+            }
         },
 
         async fetchStructure(accession) {
@@ -565,14 +583,13 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
             return structure
         },
 
-        async fetchDimerStructure(id1, id2, chain1 = 'A', chain2 = 'B') {
+        async fetchDimerStructure(id1, id2) {
             const [r1, r2] = await Promise.all([
                 this.$axios.get("/structure/" + id1),
                 this.$axios.get("/structure/" + id2)
             ]);
             let pdb1 = await pulchra(mockPDB(r1.data.coordinates, r1.data.seq));
             let pdb2 = await pulchra(mockPDB(r2.data.coordinates, r2.data.seq));
-            // TODO: How can we set chain names if they are long? 
             pdb1 = setChainName(pdb1, 'A'); // Chain Names are gone after running pulchra
             pdb2 = setChainName(pdb2, 'B'); 
             const combined = pdb1.split('END')[0] + '\n' + pdb2.split('END')[0];
@@ -581,9 +598,9 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
             return structure;
         },
 
-        async getStructureCompoments(component, chainId1 = 'A', chainId2 = 'B') {
-            const chain1_sel = MS.struct.generator.atomGroups({'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId1])});
-            const chain2_sel = MS.struct.generator.atomGroups({'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), chainId2])});
+        async getStructureComponents(component) {
+            const chain1_sel = MS.struct.generator.atomGroups({'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'A'])});
+            const chain2_sel = MS.struct.generator.atomGroups({'chain-test': MS.core.rel.eq([MS.struct.atomProperty.macromolecular.auth_asym_id(), 'B'])});
 
             const interface1_sel = MS.struct.modifier.intersectBy({
                 0: chain1_sel,
@@ -641,17 +658,19 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
 
         if (this.cluster) {
             await this.loadClusterStructure();
-            const { chain1, chain2, interface1, interface2 } = await this.getStructureCompoments(this.component);
+            const { chain1, chain2, interface1, interface2 } = await this.getStructureComponents(this.component);
             this.chain1 = chain1;
             this.chain2 = chain2;
             this.interface1 = interface1;
             this.interface2 = interface2;
-            await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2);
-            this.plugin?.managers.camera.reset();
+            await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2, this.cluster);
+            
 
             if (this.second && this.second !== "") {
                 await this.loadSecondStructure();
             }
+
+            this.focusInterface();
         }
 
     },
@@ -711,5 +730,33 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
     position: absolute;
     z-index: 999;
     right:0;
+}
+
+</style>
+
+<style>
+.msp-highlight-toast-wrapper {
+    z-index: 9999;
+    position: absolute !important;
+    left: 0px !important;
+    top: 0px !important;
+    width: fit-content;
+    pointer-events: none;
+}
+
+.msp-highlight-toast-wrapper:empty {
+    display: none !important;
+}
+
+.msp-highlight-toast-wrapper .msp-highlight-info {
+    white-space: nowrap;
+    color: white !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    padding: 4px 4px !important;
+    border-radius: 4px !important;
+}
+
+.msp-plugin canvas {
+    position: relative;
 }
 </style>
