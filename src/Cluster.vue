@@ -85,8 +85,16 @@
                         </div>
 
                         <div style="grid-area: 1/2/2/3">
-                        <dt class="mb-0">Interaction Orderedness</dt>
-                        <dd class="mt-0 dd-tight"><svg ref="barOrderDisorder" class="chart"></svg>                            </dd>
+                        <dt class="mb-0 d-flex align-center">
+                            <span>Interaction Orderedness&nbsp;</span>
+                            <v-tooltip top>
+                                <template v-slot:activator="{ on }">
+                                    <span v-on="on"><v-icon small v-on="on">{{ $MDI.HelpCircleOutline }}</v-icon></span>
+                                </template>
+                                <span>Order and disorder categories are based on IUPred2A predictions for interface residues in the unbound state</span>
+                            </v-tooltip>
+                        </dt>
+                        <dd class="mt-0 dd-tight"><svg ref="barOrderDisorder" class="chart"></svg></dd>
                         </div>
 
                         <div style="grid-area: 2/2/3/3">
