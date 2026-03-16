@@ -146,9 +146,9 @@
         </v-col>
     </v-row>
 
-    <!-- <v-flex xs12>
+    <v-flex xs12>
         <Similars :cluster="$route.params.cluster" @select="(accession) => second = accession"></Similars>
-    </v-flex> -->
+    </v-flex>
 </v-container>
 </template>
 

@@ -1,33 +1,16 @@
 <template>
 <Panel style="margin-top: 1em;" collapsible>
     <template v-slot:header>
-        Similar clusters
+        Similar Interfaces
     </template>
 
     <template v-slot:toolbar-extra>
-        <v-menu offset-y>
-            <template v-slot:activator="{ on }">
-                <v-btn plain v-on="on">
-                    <v-icon class="mr-1">{{ $MDI.Export }}</v-icon>
-                    Export
-                </v-btn>
-            </template>
-            <v-list>
-                <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/similars?format=accessions&${requestOptions.params.toString()}`" target="_blank">
-                    <v-list-item-content>
-                        <v-list-item-title>Accessions</v-list-item-title>
-                    </v-list-item-content>
-                </v-list-item>
-                <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/similars?format=fasta&${requestOptions.params.toString()}`" target="_blank">
-                    <v-list-item-content>
-                        <v-list-item-title>FASTA</v-list-item-title>
-                    </v-list-item-content>
-                </v-list-item>
-            </v-list>
-        </v-menu>
+        <v-btn plain :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/similars?format=summary&${requestOptions.params.toString()}`" target="_blank">
+            <v-icon class="mr-1">{{ $MDI.Export }}</v-icon>
+            Export
+        </v-btn>
     </template>
-
-<template v-slot:content v-if="$route.params.cluster">
+    <template v-slot:content v-if="$route.params.cluster">
     <v-data-table
         :headers="headers"
         :items="entries"
@@ -38,19 +21,23 @@
             'items-per-page-options': [10, 20, 50, 100, -1],
         }"
     >
-        <template v-slot:item.rep_accession="prop">
-            <router-link :to="{ name: 'cluster', params: { cluster: prop.value }}">{{ prop.value }}</router-link><br>
-            {{ prop.item.description }}
+        <template v-slot:item.accession="prop">
+            <ExternalLinks :accession="prop.item.pdb_id.toUpperCase()" reference="PDB" simple></ExternalLinks><br>
+            <span class="caption text--darken-1">{{ prop.item.description }}</span>
         </template>
-        <template v-slot:item.avg_len="prop">
-            {{ prop.value.toFixed(2) }}
+        <template v-slot:item.chains="prop">
+            <div>{{ prop.item.chain1 }}</div>
+            <div>{{ prop.item.chain2 }}</div>
         </template>
-
-        <template v-slot:item.avg_plddt="prop">
-            {{ prop.value.toFixed(2) }}
-        </template>
-        <template v-slot:item.rep_plddt="prop">
-            {{ prop.value.toFixed(2) }}
+        <template v-slot:item.uniprot="prop">
+            <div>
+                <span v-if ="prop.item.uniprot_id1 !== null"><ExternalLinks :accession="prop.item.uniprot_id1" simple></ExternalLinks></span>
+                <span v-else>N/A</span>
+            </div>
+            <div>
+                <span v-if ="prop.item.uniprot_id2 !== null"><ExternalLinks :accession="prop.item.uniprot_id2" simple></ExternalLinks></span>
+                <span v-else>N/A</span>
+            </div>
         </template>
         <template v-slot:header.structure="{ header }">
             {{ header.text }}
@@ -61,13 +48,13 @@
                     </span>
                 </template>
                 <span>
-                   Click on a structure to superpose it on to the cluster representative in the structure viewer
+                   Click on a structure to superpose its interface on to the cluster representative in the structure viewer
                 </span>
             </v-tooltip>
         </template>
         <template v-slot:item.structure="prop">
-            <div v-ripple="{ class: `primary--text` }" style="text-align: center; cursor: pointer;" @click="$emit('select', prop.item.rep_accession)">
-                <img :src="getImage(prop.item.rep_accession)" style="height:75px"/>
+            <div v-ripple="{ class: `primary--text` }" style="text-align: center; cursor: pointer;" @click="$emit('select', prop.item.accession)">
+                <img :src="getImage(prop.item.accession)" style="height:75px"/>
             </div>
         </template>
 
@@ -80,13 +67,24 @@
                     :disabled="taxAutocompleteDisabled">
                 </TaxonomyAutocomplete>
         </template>
-
         <template v-slot:item.lca_tax_id="prop">
-            <TaxSpan :taxonomy="prop.value"></TaxSpan>
+            <div v-if="prop.item.lca_tax_id && prop.item.lca_tax_id.name"><TaxSpan :taxonomy="prop.item.lca_tax_id"></TaxSpan></div>
+            <div v-else>N/A</div>
+        </template>
+
+        <template v-slot:item.qtm="prop">
+            {{ prop.item.qtm.toFixed(3) }}
+        </template>
+        <template v-slot:item.qchaintm="prop">
+            <div>{{ prop.item.qchaintm[0].toFixed(3) }}</div>
+            <div>{{ prop.item.qchaintm[1].toFixed(3) }}</div>
+        </template>
+        <template v-slot:item.intlddt="prop">
+            {{ prop.item.intlddt.toFixed(3) }}
         </template>
 
         <template v-slot:item.actions="{ item }">
-            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/search?accession=' + item.rep_accession + '&source=AlphaFoldDB'">
+            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/search?accession=' + item.intclu_rep_accession + '&source=AlphaFoldDB'">
                 <v-img :src="require('./assets/marv-foldseek-small.png')" max-width="16"></v-img>
             </v-chip>
         </template>
@@ -123,43 +121,49 @@ export default {
                     text: "Structure",
                     value: "structure",
                     sortable: false,
+                    width: "10%",
                 },
                 {
-                    text: "Accession",
-                    value: "rep_accession",
+                    text: "PDB ID",
+                    value: "accession",
+                    sortable: false,
+                    width: "20%",
                 },
                 {
-                    text: "Average length",
-                    value: "avg_len",
+                    text: "Chains",
+                    value: "chains",
+                    sortable: false,
+                    width: "5%",
                 },
                 {
-                    text: "Average pLDDT",
-                    value: "avg_plddt",
-                },
-                {
-                    text: "Number of members",
-                    value: "n_mem",
+                    text: "UniProt ID",
+                    value: "uniprot",
+                    sortable: false,
+                    width: "15%",
                 },
                 {
                     text: "Lowest common ancestor",
                     value: "lca_tax_id",
                     sortable: false,
+                    width: "20%",
                 },
                 {
-                    text: "Dark cluster",
-                    value: "is_dark",
+                    text: "TM-score",
+                    value: "qtm",
+                    sortable: true,
+                    width: "10%",
                 },
                 {
-                    text: "Rep pLDDT",
-                    value: "rep_plddt",
+                    text: "Chain TM-score",
+                    value: "qchaintm",
+                    sortable: false,
+                    width: "10%",
                 },
                 {
-                    text: "Rep length",
-                    value: "rep_len",
-                },
-                {
-                    text: "E-value",
-                    value: "evalue",
+                    text: "Interface LDDT",
+                    value: "intlddt",
+                    sortable: true,
+                    width: "10%",
                 },
                 { text: 'Actions', value: 'actions', sortable: false },
             ],
@@ -217,16 +221,17 @@ export default {
             if (!cluster) {
                 return;
             }
+
             this.$axios.get("/cluster/" + cluster + "/similars", this.requestOptions)
                 .then(response => {
                     this.entries = response.data.similars;
                     this.totalEntries = response.data.total;
-                    this.fetchImages(this.entries.map(m => m.rep_accession));
+                    this.fetchImages(this.entries.map(m => m.intclu_rep_accession));
                 })
                 .catch(() => {})
                 .finally(() => {
                     this.loading = false;
-                });
+                })
         }
     }
 }

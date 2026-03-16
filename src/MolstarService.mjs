@@ -113,25 +113,27 @@ export class MolstarService {
                 type: { name: 'cartoon', params: {} },
                 colorTheme: { name: 'uniform', params: { value: Colors.skyblue.hex } },
             })
-        
-        await root
-            .apply(StructureSelectionFromExpression, {
-                expression: nonInterface1,
-            })
-            .apply(StructureRepresentation3D, {
-                type: { name: 'cartoon', params: { alpha: 0.1, transparentBackfaces: 'off' } },
-                colorTheme: { name: 'uniform', params: { value: Colors.purple.hex } },
-            })
-        
-        await root
-            .apply(StructureSelectionFromExpression, {
-                expression: nonInterface2,
-            })
-            .apply(StructureRepresentation3D, {
-                type: { name: 'cartoon', params: { alpha: 0.1, transparentBackfaces: 'off' } },
-                colorTheme: { name: 'uniform', params: { value: Colors.skyblue.hex } },
-            })
             .commit();
+        
+        // Set Non interface region transparent
+        // await root
+        //     .apply(StructureSelectionFromExpression, {
+        //         expression: nonInterface1,
+        //     })
+        //     .apply(StructureRepresentation3D, {
+        //         type: { name: 'cartoon', params: { alpha: 0.1, transparentBackfaces: 'off' } },
+        //         colorTheme: { name: 'uniform', params: { value: Colors.purple.hex } },
+        //     })
+        
+        // await root
+        //     .apply(StructureSelectionFromExpression, {
+        //         expression: nonInterface2,
+        //     })
+        //     .apply(StructureRepresentation3D, {
+        //         type: { name: 'cartoon', params: { alpha: 0.1, transparentBackfaces: 'off' } },
+        //         colorTheme: { name: 'uniform', params: { value: Colors.skyblue.hex } },
+        //     })
+        //     .commit();
 
         this.plugin.managers.camera.reset(undefined, 0);
         this.plugin.canvas3d?.commit(true);

@@ -50,7 +50,7 @@
                     </span>
                 </template>
                 <span>
-                   Click on a structure to superpose it on to the cluster representative in the structure viewer
+                   Click on a structure to superpose its interface on to the cluster representative in the structure viewer
                 </span>
             </v-tooltip>
         </template>
@@ -169,13 +169,13 @@ export default {
                     text: "Chains",
                     value: "chains",
                     sortable: false,
-                    width: "10%",
+                    width: "5%",
                 },
                 {
                     text: "UniProt ID",
                     value: "uniprot",
                     sortable: false,
-                    width: "20%",
+                    width: "15%",
                 },
                 {
                     text: "Taxonomy",
@@ -187,7 +187,7 @@ export default {
                     text: "Clustered step",
                     value: "flag",
                     sortable: false,
-                    width: "10%",
+                    width: "5%",
                 },
                 {
                     text: 'Actions',

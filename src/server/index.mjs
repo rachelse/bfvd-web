@@ -49,8 +49,8 @@ checkpoints.push(caDb.make(dataPath + '/afdb_ca', dataPath + '/afdb_ca.index'));
 const descDB = new DbReader();
 checkpoints.push(descDB.make(dataPath + '/pdb_desc', dataPath + '/pdb_desc.index'));
 
-// const avaDb = new DbReader();
-// checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
+const avaDb = new DbReader();
+checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
 
 let warnDB = null;
 if (existsSync(dataPath + '/warning_db')) {
@@ -688,6 +688,63 @@ function processAndWriteInChunks(data, chunkSize, processingFunc, writeFunc) {
     }
 }
 
+function parseAvaRows(avaRaw) {
+    // RACHEL TODO: decide which criteria to use for filtering similar clusters
+    const rows = avaRaw
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => line.split(/\s+/));
+
+    const scoreKeysByLength = {
+        1: ['evalue'],
+        7: ['qtm', 'ttm', 'qcov', 'tcov', 'qchaintm', 'tchaintm', 'intlddt'],
+        8: ['evalue', 'qtm', 'ttm', 'qcov', 'tcov', 'qchaintm', 'tchaintm', 'intlddt'],
+    };
+
+    const scoreByAccession = new Map();
+    const accessions = [];
+    const seenAccessions = new Set();
+
+    rows.forEach((cols) => {
+        const accession = cols[0];
+        if (!accession) {
+            return;
+        }
+
+        if (!seenAccessions.has(accession)) {
+            seenAccessions.add(accession);
+            accessions.push(accession);
+        }
+
+        const values = cols.slice(1);
+        const scoreKeys = scoreKeysByLength[values.length];
+        const scores = {};
+
+        if (scoreKeys) {
+            for (let i = 0; i < scoreKeys.length; i++) {
+                const sc = scoreKeys[i];
+                if (sc === 'qchaintm' || sc === 'tchaintm') {
+                    scores[sc] = values[i].split(',').map((x) => parseFloat(x));
+                } else {
+                    scores[scoreKeys[i]] = parseFloat(values[i]);
+                }
+            }
+        } else {
+            for (let i = 0; i < values.length; i++) {
+                scores[`score${i + 1}`] = parseFloat(values[i]);
+            }
+            if (values.length > 0) {
+                scores.evalue = parseFloat(values[0]);
+            }
+        }
+
+        scoreByAccession.set(accession, scores);
+    });
+
+    return { accessions, scoreByAccession };
+}
+
 app.get('/api/cluster/:cluster/members', async (req, res) => {
     let flagFilter = '';
     let args = [ req.params.cluster ];
@@ -893,28 +950,31 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
         return;
     }
     const ava = avaDb.data(avaKey.value).toString('ascii');
-    let ids_evalue = ava.split('\n').map((x) => x.split(' '));
-    ids_evalue.splice(-1);
-    let map = new Map(ids_evalue);
-    const accessions = ids_evalue.map((x) => x[0]);
+    const { accessions, scoreByAccession } = parseAvaRows(ava);
+    if (accessions.length === 0) {
+        res.send([]);
+        return;
+    }
     let result = await sql.all(`
     SELECT *
         FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+        JOIN member ON cluster.intclu_rep_accession = member.accession
+        WHERE cluster.intclu_rep_accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     result.forEach((x) => {
-        x.evalue = map.get(x.rep_accession);
+        const scores = scoreByAccession.get(x.intclu_rep_accession) || {};
+        Object.assign(x, scores);
         x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
     });
-    // console.log(result)
-    if (req.query.tax_id1) {
+
+    if (req.query.tax_id) {
         result = result.filter((x) => {
             let currNode = x.lca_tax_id;
             if (currNode == null) {
                 return false;
             }
             while (currNode.id != 1) {
-                if (currNode.id == req.query.tax_id1) {
+                if (currNode.id == req.query.tax_id) {
                     return true;
                 }
                 currNode = tree.getNode(currNode.parent);
@@ -927,13 +987,13 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
         let sortBy = req.query.sortBy;
         let sortDesc = req.query.sortDesc.toLowerCase() === "true";
         if (sortBy == "") {
-            sortBy = "evalue";
-            sortDesc = false;
+            sortBy = "qtm";
+            sortDesc = true;
         }
 
         const identity = (x) => x;
         let castFun = identity;
-        if (sortBy == 'evalue') {
+        if (sortBy == 'qtm') {
             castFun = parseFloat;
         }
         let sorted = result.sort((a, b) => {
@@ -950,14 +1010,14 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
                 return 0;
             }
         })
-        sorted = sorted.filter((x) => x.rep_accession != cluster);
+        sorted = sorted.filter((x) => x.intclu_rep_accession != cluster);
         const total = sorted.length;
         sorted = sorted.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
-        sorted.forEach((x) => { x.description = getDescription(x.rep_accession) });
+        sorted.forEach((x) => { x.description = getDescription(x.intclu_rep_accession) });
         res.send({ total: total, similars: sorted });
         return;
     } else {
-        result.forEach((x) => { x.description = getDescription(x.rep_accession) });
+        result.forEach((x) => { x.description = getDescription(x.intclu_rep_accession) });
     }
 
     const safeCluster = req.params.cluster.replace(/[^a-zA-Z0-9]/g, '');
@@ -967,7 +1027,7 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
             res.setHeader('Content-Type', 'text/plain');
             res.charset = 'UTF-8';
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => similar.rep_accession).join('\n'),
+                chunk => chunk.map(similar => similar.intclu_rep_accession).join('\n'),
                 chunk => res.write(chunk));
             res.end();
             break;
@@ -978,9 +1038,41 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
             res.charset = 'UTF-8';
 
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => `>${similar.rep_accession} ${similar.description.trimEnd()} OX=${similar.lca_tax_id ? similar.lca_tax_id.id : '0'} OS=${similar.lca_tax_id ? similar.lca_tax_id.name : 'unknown'} Eval=${similar.evalue}\n${aaDb.data(aaDb.id(similar.rep_accession).value).toString('ascii')}`).join(''),
+                chunk => chunk.map(similar => `>${similar.intclu_rep_accession} ${similar.description.trimEnd()} OX=${similar.lca_tax_id ? similar.lca_tax_id.id : '0'} OS=${similar.lca_tax_id ? similar.lca_tax_id.name : 'unknown'} Eval=${similar.evalue}\n${aaDb.data(aaDb.id(similar.intclu_rep_accession).value).toString('ascii')}`).join(''),
                 chunk => res.write(chunk));
 
+            res.end();
+            break;
+        case 'summary':
+            res.setHeader('Content-Disposition', `attachment; filename=similars-summary-${safeCluster}.tsv`);
+            res.setHeader('Content-Type', 'text/plain');
+            res.charset = 'UTF-8';
+            
+            const headers = ['accession', 'description', 'pdb_id', 'chainA', 'chainB', 'uniprot_idA', 'uniprot_idB', 'lca_tax_id', 'tm-score', 'chainA_tm-score', 'chainB_tm-score', 'interface_lddt'];
+            res.write(headers.join('\t') + '\n');
+            
+            processAndWriteInChunks(result, 10000,
+                chunk => chunk.map(c => {
+                    return [
+                        c.accession,
+                        c.description, // Passed raw, handled safely below
+                        c.pdb_id,
+                        c.chain1,
+                        c.chain2,
+                        c.uniprot_id1,
+                        c.uniprot_id2,
+                        c.lca_tax_id ? c.lca_tax_id.id : '',
+                        c.qtm,
+                        c.qchaintm[0],
+                        c.qchaintm[1],
+                        c.intlddt
+                    ]
+                    // Clean nulls, newlines, carriage returns, and tabs all at once
+                    .map(val => String(val || '').replace(/[\r\n\t]+/g, ' '))
+                    .join('\t');
+                }).join('\n') + '\n',
+                chunk => res.write(chunk)
+            );
             res.end();
             break;
         
@@ -998,13 +1090,15 @@ app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => 
         return;
     }
     const ava = avaDb.data(avaKey.value).toString('ascii');
-    let ids_evalue = ava.split('\n').map((x) => x.split(' '));
-    ids_evalue.splice(-1);
-    const accessions = ids_evalue.map((x) => x[0]);
+    const { accessions } = parseAvaRows(ava);
+    if (accessions.length === 0) {
+        res.send([]);
+        return;
+    }
     let result = await sql.all(`
     SELECT *
         FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+        WHERE intclu_rep_accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     let suggestions = {};
     let count = 0;
