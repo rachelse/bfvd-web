@@ -88,10 +88,11 @@ export default {
             var reader = new FileReader();
             reader.onload = e => {
                 new Promise((resolve, reject) => {
-                    this.$axios.post('https://search.foldseek.com/api/ticket', convertToQueryUrl({
+                    this.$axios.post('https://search-dev.foldseek.com/api/ticket', convertToQueryUrl({
+                    // this.$axios.post('http://localhost:8081/api/ticket', convertToQueryUrl({
                         q: extractAtomRecords(e.target.result),
                         database: ["interfacedb_target"],
-                        mode: "complex-3diaa"
+                        mode: "interface-3diaa"
                     }), {
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded'
@@ -100,7 +101,8 @@ export default {
                     .then(result => {
                         let job = result.data;
                         const checkJobStatus = () => {
-                            this.$axios.get('https://search.foldseek.com/api/ticket/' + job.id)
+                            this.$axios.get('https://search-dev.foldseek.com/api/ticket/' + job.id)
+                            // this.$axios.get('http://localhost:8081/api/ticket/' + job.id)
                                 .then(result => {
                                     job = result.data;
                                     if (job.status === 'PENDING' || job.status === 'RUNNING') {

@@ -118,7 +118,8 @@
 
         <template v-slot:item.actions="{ item }">
             <!-- TODO: we cannot source it from external database -->
-            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/multimer?accession=' + item.accession + '&source=AlphaFoldDB'" target="_blank">
+            <!-- <v-chip title="Search with Foldseek" :href="'http://localhost:8082/interface?accession=' + item.pdb_id + '&source=PDB'" target="_blank"> -->
+            <v-chip title="Search with Foldseek" :href="'https://search-dev.foldseek.com/interface?accession=' + item.pdb_id + '&source=PDB'" target="_blank">
                 <v-img :src="require('./assets/marv-foldseek-small.png')" max-width="16"></v-img>
             </v-chip>
         </template>

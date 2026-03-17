@@ -29,7 +29,7 @@ console.timeLog();
 
 console.log('Loading SQL...')
 const sql = await open({
-    filename: dataPath + '/afdb.sqlite3',// '/afdb-clusters.sqlite3',
+    filename: dataPath + '/interfaceclusterdb.sqlite3',// '/afdb-clusters.sqlite3',
     driver: sqlite3.Database,
     mode: sqlite3.OPEN_READONLY,
 })
@@ -38,13 +38,10 @@ console.timeLog();
 console.log('Loading Databases...')
 const checkpoints = [];
 const aaDb = new DbReader();
-checkpoints.push(aaDb.make(dataPath + '/afdb', dataPath + '/afdb.index'));
+checkpoints.push(aaDb.make(dataPath + '/interfaceclusterdb', dataPath + '/interfaceclusterdb.index'));
 
 const caDb = new DbReader();
-checkpoints.push(caDb.make(dataPath + '/afdb_ca', dataPath + '/afdb_ca.index'));
-
-// const plddtDB = new DbReader();
-// checkpoints.push(plddtDB.make(dataPath + '/afdb_plddt', dataPath + '/afdb_plddt.index'));
+checkpoints.push(caDb.make(dataPath + '/interfaceclusterdb_ca', dataPath + '/interfaceclusterdb_ca.index'));
 
 const descDB = new DbReader();
 checkpoints.push(descDB.make(dataPath + '/pdb_desc', dataPath + '/pdb_desc.index'));
@@ -349,7 +346,8 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
         results = JSON.parse(fileCache.get(jobid));
 
     } else {
-        let result = await axios.get('https://search.foldseek.com/api/result/' + jobid + '/0', {
+        let result = await axios.get('https://search-dev.foldseek.com/api/result/' + jobid + '/0', {
+        // let result = await axios.get('http://localhost:8081/api/result/' + jobid + '/0', {
             maxBodyLength: Infinity,
             maxContentLength: Infinity,
         });

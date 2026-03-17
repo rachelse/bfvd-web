@@ -4,8 +4,8 @@
         <template v-slot:header>
             Cluster selection
             <template v-if="$route.params.jobid">
-                <!-- for <a :href="'https://search.foldseek.com/result/' + $route.params.jobid + '/0'" target="_blank" rel="noopener">{{ $route.params.jobid }}</a> -->
-                for <a :href="'http://localhost:8081/result/' + $route.params.jobid + '/0'" target="_blank" rel="noopener">{{ $route.params.jobid }}</a>
+                for <a :href="'https://search-dev.foldseek.com/result/' + $route.params.jobid + '/0'" rel="noopener">{{ $route.params.jobid }}</a>
+                <!-- for <a :href="'http://localhost:8081/result/' + $route.params.jobid + '/0'" rel="noopener">{{ $route.params.jobid }}</a> -->
             </template>
         </template>
     
@@ -21,16 +21,14 @@
             >
                 <template v-slot:item.structure="prop">
                     <div style="text-align: center;">
-                        <router-link :to="{ name: 'cluster', params: { cluster: prop.item.intclu_rep_accession }}" target='_blank'>
+                        <router-link :to="{ name: 'cluster', params: { cluster: prop.item.intclu_rep_accession }}" >
                             <img :src="getImage(prop.item.intclu_rep_accession)" style="height:75px"/>
                         </router-link>
                     </div>
                 </template>
                 <template v-slot:item.pdb_id="prop">
                     <div class="align-left">
-                        <ExternalLinks :accession="prop.value.toUpperCase()" reference="PDB" simple>
-                            <!-- <router-link v-slot:accession :to="{ name: 'cluster', params: { cluster: prop.item.intclu_rep_accession }}" target='_blank'>{{ prop.item.intclu_rep_accession }}</router-link> -->
-                        </ExternalLinks><br>
+                        <ExternalLinks :accession="prop.value.toUpperCase()" reference="PDB" simple></ExternalLinks><br>
                         {{ prop.item.description  }}
                     </div>
                 </template>

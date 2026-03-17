@@ -84,7 +84,9 @@
         </template>
 
         <template v-slot:item.actions="{ item }">
-            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/search?accession=' + item.intclu_rep_accession + '&source=AlphaFoldDB'">
+            <v-chip title="Search with Foldseek" :href="'https://search-dev.foldseek.com/interface?accession=' + item.pdb_id + '&source=PDB'" target="_blank">
+                <!-- TODO: we cannot source it from external database -->
+            <!-- <v-chip title="Search with Foldseek" :href="'http://localhost:8082/interface?accession=' + item.pdb_id + '&source=PDB'" target="_blank"> -->
                 <v-img :src="require('./assets/marv-foldseek-small.png')" max-width="16"></v-img>
             </v-chip>
         </template>
