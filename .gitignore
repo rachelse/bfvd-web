@@ -11,6 +11,8 @@ resources/
 backend/.cache/
 .vscode/
 
+data/*.tsv
+data/*.bk
 data/interfacedb/*
 data/dimerdb/*
 data/obsolete/*
