@@ -91,7 +91,7 @@ export default {
                     this.$axios.post('https://search-dev.foldseek.com/api/ticket', convertToQueryUrl({
                     // this.$axios.post('http://localhost:8081/api/ticket', convertToQueryUrl({
                         q: extractAtomRecords(e.target.result),
-                        database: ["interfacedb_target"],
+                        database: ["pdb_intclurep"],
                         mode: "interface-3diaa"
                     }), {
                         headers: {

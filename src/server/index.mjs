@@ -29,7 +29,7 @@ console.timeLog();
 
 console.log('Loading SQL...')
 const sql = await open({
-    filename: dataPath + '/interfaceclusterdb.sqlite3',// '/afdb-clusters.sqlite3',
+    filename: dataPath + '/interfaceclusterdb.sqlite3',
     driver: sqlite3.Database,
     mode: sqlite3.OPEN_READONLY,
 })
@@ -364,7 +364,7 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
                 
                 let accession = "";
                 try {
-                    accession = target.match(/DI\d+_(\d+)DI/)[1];
+                    accession = target.match(/(\d+)DI/)[1];
                 } catch (e) {
                     console.log("error retrieving accession: ", target);
                     accession = "error-retrieving-accession";
