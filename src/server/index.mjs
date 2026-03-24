@@ -346,47 +346,62 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
         results = JSON.parse(fileCache.get(jobid));
 
     } else {
-        let result = await axios.get('https://search-dev.foldseek.com/api/result/' + jobid + '/0', {
-        // let result = await axios.get('http://localhost:8081/api/result/' + jobid + '/0', {
-            maxBodyLength: Infinity,
-            maxContentLength: Infinity,
-        });
+        try {
+            let result = await axios.get('https://search-dev.foldseek.com/api/result/' + jobid + '/0', {
+            // let result = await axios.get('http://localhost:8081/api/result/' + jobid + '/0', {
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
+            });
 
-        const aln = result.data;
-        for (let i = 0; i < aln.results.length; i++) {
-            let result = aln.results[i];
-            if (!result.alignments || !result.alignments[0]) {
-                continue;
+            const aln = result.data;
+            
+            // Check if results exist and are valid
+            if (!aln || !aln.results) {
+                results = [];
+            } else {
+                for (let i = 0; i < aln.results.length; i++) {
+                    let result = aln.results[i];
+                    if (!result.alignments || !result.alignments[0]) {
+                        continue;
+                    }
+                    
+                    for (let j = 0; j < result.alignments[0].length; j++) {
+                        const target = result.alignments[0][j].target;
+                        
+                        let accession = "";
+                        try {
+                            accession = target.match(/(\d+)DI/)[1];
+                        } catch (e) {
+                            console.log("error retrieving accession: ", target);
+                            accession = "error-retrieving-accession";
+                        }
+                        // TODO: decide filtering criteria
+                        // if (result.alignments[0][j].prob < 0.95) {
+                        //     continue;
+                        // }
+                        results.push({
+                            accession: accession,
+                            eval: result.alignments[0][j].eval,
+                            score: result.alignments[0][j].score,
+                            seqId: result.alignments[0][j].seqId,
+                            prob: result.alignments[0][j].prob,
+                            complexqtm: result.alignments[0][j].complexqtm,
+                            complexttm: result.alignments[0][j].complexttm,
+
+                        });
+                    }
+                }
             }
             
-            for (let j = 0; j < result.alignments[0].length; j++) {
-                const target = result.alignments[0][j].target;
-                
-                let accession = "";
-                try {
-                    accession = target.match(/(\d+)DI/)[1];
-                } catch (e) {
-                    console.log("error retrieving accession: ", target);
-                    accession = "error-retrieving-accession";
-                }
-                // TODO: decide filtering criteria
-                // if (result.alignments[0][j].prob < 0.95) {
-                //     continue;
-                // }
-                results.push({
-                    accession: accession,
-                    eval: result.alignments[0][j].eval,
-                    score: result.alignments[0][j].score,
-                    seqId: result.alignments[0][j].seqId,
-                    prob: result.alignments[0][j].prob,
-                    complexqtm: result.alignments[0][j].complexqtm,
-                    complexttm: result.alignments[0][j].complexttm,
-
-                });
+            fileCache.add(jobid, JSON.stringify(results));
+        } catch (error) {
+            console.error("Error fetching results from Foldseek API for jobid:", jobid, error.message);
+            // TODO: Add no result found handling on the frontend for this case
+            if (error.response && error.response.data) {
+                console.error("API error response:", error.response.data);
             }
+            results = [];
         }
-        
-        fileCache.add(jobid, JSON.stringify(results));
     }
 
     let filter_params = [];
@@ -963,6 +978,13 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
         const scores = scoreByAccession.get(x.intclu_rep_accession) || {};
         Object.assign(x, scores);
         x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
+        x.description = getDescription(x.intclu_rep_accession);
+        if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
+            x.uniprot_id1 = null;
+        }
+        if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
+            x.uniprot_id2 = null;
+        }
     });
 
     if (req.query.tax_id) {
@@ -1011,11 +1033,9 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
         sorted = sorted.filter((x) => x.intclu_rep_accession != cluster);
         const total = sorted.length;
         sorted = sorted.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
-        sorted.forEach((x) => { x.description = getDescription(x.intclu_rep_accession) });
         res.send({ total: total, similars: sorted });
         return;
     } else {
-        result.forEach((x) => { x.description = getDescription(x.intclu_rep_accession) });
     }
 
     const safeCluster = req.params.cluster.replace(/[^a-zA-Z0-9]/g, '');
