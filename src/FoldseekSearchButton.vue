@@ -231,6 +231,7 @@ export default {
                 
                 if (chains.length < 2) {
                     this.error = "Interface search requires at least two chains but only " + chains.length + " found.";
+                    this.showChainSelection = false;
                     return;
                 }
                 
