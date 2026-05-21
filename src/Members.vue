@@ -114,10 +114,10 @@
                 </TaxonomyAutocomplete>
         </template>
         <template v-slot:item.tax_id="prop">
-            <div v-if="prop.item.tax_id1 && prop.item.tax_id1.name"><TaxSpan :taxonomy="prop.item.tax_id1"></TaxSpan></div>
-            <div v-else>N/A</div>
-            <div v-if="prop.item.tax_id2 && prop.item.tax_id2.name"><TaxSpan :taxonomy="prop.item.tax_id2"></TaxSpan></div>
-            <div v-else>N/A</div>
+            <div class="text-caption" v-if="prop.item.tax_id1 && prop.item.tax_id1.name"><TaxSpan :taxonomy="prop.item.tax_id1"></TaxSpan></div>
+            <div class="text-caption" v-else>N/A</div>
+            <div class="text-caption" v-if="prop.item.tax_id2 && prop.item.tax_id2.name"><TaxSpan :taxonomy="prop.item.tax_id2"></TaxSpan></div>
+            <div class="text-caption" v-else>N/A</div>
         </template>
 
         <template v-slot:item.actions="{ item }">
@@ -168,7 +168,7 @@ export default {
                     text: "PDB ID",
                     value: "accession",
                     sortable: false,
-                    width: "25%",
+                    width: "20%",
                 },
                 {
                     text: "Chains",
@@ -186,10 +186,10 @@ export default {
                     text: "Taxonomy",
                     value: "tax_id",
                     sortable: false,
-                    width: "50%",
+                    width: "40%",
                 },
                 {
-                    text: "Clustered step",
+                    text: "Cluster-level",
                     value: "flag",
                     sortable: false,
                     width: "5%",
@@ -198,7 +198,7 @@ export default {
                     text: 'Actions',
                     value: 'actions',
                     sortable: false,
-                    width: "10%",
+                    width: "5%",
                 },
             ],
             members: [],

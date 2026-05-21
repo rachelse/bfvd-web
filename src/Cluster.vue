@@ -46,7 +46,7 @@
                         <dd class="mt-0 dd-tight"><svg ref="barSS" class="chart"></svg></dd>
                         </div>
 
-                        <div style=" grid-area: 2/1/3/2;">
+                        <div style="grid-area: 2/1/3/2; margin-top: -1rem;">
                         <dt>
                             Lowest common ancestor and lineage<v-btn plain text small icon @click="showLineage = !showLineage"><v-icon small>{{ showLineage ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon></v-btn>
                         </dt>
@@ -59,7 +59,7 @@
                         </dd>
                         </div>
                     </dl>
-                    <v-divider style="margin-top:0.5em"></v-divider>
+                    <v-divider style="margin-top:0em; margin-bottom: 1em;"></v-divider>
 
                     <div class="d-flex align-center justify-space-between mb-0">
                         <!-- <h3 class="mb-0 mt-0">Representative Summary</h3> -->
