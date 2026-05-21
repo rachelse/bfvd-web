@@ -201,10 +201,10 @@ export default {
                     { label: 'Unannotated',          value: this.response.ord_unanno_pct },
                 ], { isFraction: true });
                 drawStackedBar(this.$refs.barSS, [
-                    { label: 'Mixed α/β',   value: this.response.ss_mixedaB_pct },
-                    { label: 'Mostly α',    value: this.response.ss_mostlya_pct },
-                    { label: 'Only α/β',    value: this.response.ss_onlyaB_pct },
-                    { label: 'Other',       value: this.response.ss_other_pct },
+                    { label: 'Helix',   value: this.response.ss_helix_frac },
+                    { label: 'Beta/Strand',    value: this.response.ss_beta_strand_frac },
+                    { label: 'Turn/Bend',    value: this.response.ss_turn_bend_frac },
+                    { label: 'Unassigned',       value: this.response.ss_unassigned_frac },
                 ], { isFraction: true });
                 });
             }

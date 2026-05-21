@@ -39,10 +39,10 @@ CREATE TABLE cluster (
 	ord_ordord_pct REAL,
 	ord_unanno_pct REAL,
 
-	ss_mixedaB_pct REAL,
-	ss_mostlya_pct REAL,
-	ss_onlyaB_pct REAL,
-	ss_other_pct REAL
+	ss_helix_frac REAL,
+	ss_beta_strand_frac REAL,
+	ss_turn_bend_frac REAL,
+	ss_unassigned_frac REAL
 );
 
 PRAGMA journal_mode=OFF;
@@ -88,10 +88,10 @@ CREATE TABLE tmpCluster (
 	ord_disord_pct REAL,
 	ord_ordord_pct REAL,
 	ord_unanno_pct REAL,
-	ss_mixedaB_pct REAL,
-	ss_mostlya_pct REAL,
-	ss_onlyaB_pct REAL,
-	ss_other_pct REAL
+	ss_helix_frac REAL,
+	ss_beta_strand_frac REAL,
+	ss_turn_bend_frac REAL,
+	ss_unassigned_frac REAL
 );
 
 .import "${2}" tmpMember
@@ -127,10 +127,10 @@ ON member(uniprot_id2);
 -- Insert clusters
 INSERT INTO cluster (intclu_rep_accession, n_mem, lca_tax_id, lca_tax_chain1_id, lca_tax_chain2_id,
 					ord_disdis_pct, ord_disord_pct, ord_ordord_pct, ord_unanno_pct,
-					ss_mixedaB_pct, ss_mostlya_pct, ss_onlyaB_pct, ss_other_pct)
+					ss_helix_frac, ss_beta_strand_frac, ss_turn_bend_frac, ss_unassigned_frac)
 SELECT rep_id, n_mem, lca_tax_id, lca_tax_chain1_id, lca_tax_chain2_id,
 		ord_disdis_pct, ord_disord_pct, ord_ordord_pct, ord_unanno_pct,
-		ss_mixedaB_pct, ss_mostlya_pct, ss_onlyaB_pct, ss_other_pct
+		ss_helix_frac, ss_beta_strand_frac, ss_turn_bend_frac, ss_unassigned_frac
 FROM tmpCluster;
 
 -- Index on cluster representative accessions

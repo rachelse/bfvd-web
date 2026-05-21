@@ -171,7 +171,7 @@ export default {
                     width: "20%",
                 },
                 {
-                    text: "Chains",
+                    text: "Chain",
                     value: "chains",
                     sortable: false,
                     width: "5%",
