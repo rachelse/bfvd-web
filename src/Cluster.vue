@@ -65,8 +65,8 @@
                         <!-- <h3 class="mb-0 mt-0">Representative Summary</h3> -->
                         <h3>Representative: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
                     </div>
-                    <p class="mb-1 mt-0 text-body-1">
-                        {{ response.description }} | 
+                    <p class="mb-1 mt-0 text-body-2">
+                        {{ response.description }}<br>
                         {{ response.protein1_status == true ? "Protein" : "Peptide" }}-{{ response.protein2_status == true ? "Protein" : "Peptide" }} |
                         {{ response.iftype1 == 2 ? "Ordered" : (response.iftype1 == 1 ? "Disordered" : "Unannotated") }}-{{ response.iftype2 == 2 ? "Ordered" : (response.iftype2 == 1 ? "Disordered" : "Unannotated") }} Interaction
                     </p>
@@ -93,7 +93,7 @@
                                             <span v-for="(taxonomy, index) in response.rep_lineage1"><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></span>
                                         </dd>
                                     </td>
-                                    <td class="caption grey--text text-truncate" style="max-width: 150px;" :title="response.gene_name1 || 'N/A'">
+                                    <td style="max-width: 150px;" :title="response.gene_name1 || 'N/A'">
                                         {{ response.gene_name1 || 'N/A' }}
                                     </td>
                                 </tr>
@@ -108,7 +108,7 @@
                                             <span v-for="(taxonomy, index) in response.rep_lineage2" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></span>
                                         </dd>
                                     </td>
-                                    <td class="caption grey--text text-truncate" style="max-width: 150px;" :title="response.gene_name2 || 'N/A'">
+                                    <td style="max-width: 150px;" :title="response.gene_name2 || 'N/A'">
                                         {{ response.gene_name2 || 'N/A' }}
                                     </td>
                                 </tr>

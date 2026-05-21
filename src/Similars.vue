@@ -23,7 +23,11 @@
     >
         <template v-slot:item.accession="prop">
             <ExternalLinks :accession="prop.item.pdb_id.toUpperCase()" reference="PDB" simple></ExternalLinks><br>
-            <span class="caption text--darken-1">{{ prop.item.description }}</span>
+            <span
+                class="caption text--darken-1"
+                :title="prop.item.description || ''"
+                style="display: inline-block; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;"
+            >{{ prop.item.description }}</span>
         </template>
         <template v-slot:item.chains="prop">
             <div>{{ prop.item.chain1 }}</div>
