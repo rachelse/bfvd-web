@@ -22,7 +22,9 @@ CREATE TABLE member (
 	protein1_status BOOLEAN,
 	protein2_status BOOLEAN,
 	iftype1 INTEGER,
-	iftype2 INTEGER
+	iftype2 INTEGER,
+	gene_name1 TEXT,
+	gene_name2 TEXT
 );
 
 CREATE TABLE cluster (
@@ -70,7 +72,9 @@ CREATE TABLE tmpMember (
 	protein1_status BOOLEAN,
 	protein2_status BOOLEAN,
 	iftype1 INTEGER,
-	iftype2 INTEGER
+	iftype2 INTEGER,
+	gene_name1 TEXT,
+	gene_name2 TEXT
 );
 
 CREATE TABLE tmpCluster (
@@ -100,10 +104,10 @@ SET pdb_id = SUBSTR(pdb_id, 1, INSTR(pdb_id, '-assembly') - 1);
 -- Insert members & index on accession
 INSERT INTO member (accession, diclu_rep_accession, intclu_rep_accession, flag, 
 					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, 
-					chain1, chain2, chain1_id, chain2_id, protein1_status, protein2_status, iftype1, iftype2)
+					chain1, chain2, chain1_id, chain2_id, gene_name1, gene_name2, protein1_status, protein2_status, iftype1, iftype2)
 SELECT mem_id, diclu_id, intclu_id, flag, 
 		tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, 
-		chain1, chain2, chain1_id, chain2_id, protein1_status, protein2_status, iftype1, iftype2
+		chain1, chain2, chain1_id, chain2_id, gene_name1, gene_name2, protein1_status, protein2_status, iftype1, iftype2
 FROM tmpMember;
 
 -- Index on member accessions

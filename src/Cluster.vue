@@ -12,62 +12,6 @@
                 </template>
 
                 <template v-slot:content v-if="response">
-                    <div class="d-flex align-center justify-space-between mb-0">
-                        <!-- <h3 class="mb-0 mt-0">Representative Summary</h3> -->
-                        <h3>Representative: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
-                    </div>
-                    <p class="mb-1 mt-0 text-body-1">
-                        {{ response.description }} | 
-                        {{ response.protein1_status == true ? "Protein" : "Peptide" }}-{{ response.protein2_status == true ? "Protein" : "Peptide" }} |
-                        {{ response.iftype1 == 2 ? "Ordered" : (response.iftype1 == 1 ? "Disordered" : "Unannotated") }}-{{ response.iftype2 == 2 ? "Ordered" : (response.iftype2 == 1 ? "Disordered" : "Unannotated") }} Interaction
-                    </p>
-
-                    <v-simple-table dense class="representative-table">
-                        <template v-slot:default>
-                            <thead>
-                                <tr>
-                                    <th class="text-left">Chain</th>
-                                    <th class="text-left">UniProt</th>
-                                    <th class="text-left">Taxonomy <v-btn plain text small icon @click="showTaxonomy = !showTaxonomy"><v-icon small>{{ showTaxonomy ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon></v-btn></th>
-                                    <th class="text-left">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr class="row-a">
-                                    <td>{{ response.chain1 }}</td>
-                                    <td v-if="response.uniprot_id1  !== null"><ExternalLinks :accession="response.uniprot_id1" /></td>
-                                    <td v-else>N/A</td>
-                                    <td>
-                                        <dd v-if="response.tax_id1 == null">N/A</dd>
-                                        <dd v-else-if="!showTaxonomy">{{ response.tax_id1.name }}</dd>
-                                        <dd v-else>
-                                            <span v-for="(taxonomy, index) in response.rep_lineage1"><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></span>
-                                        </dd>
-                                    </td>
-                                    <td class="caption grey--text text-truncate" style="max-width: 150px;">
-                                        <!-- TODO change -->
-                                    </td>
-                                </tr>
-                                <tr class="row-b">
-                                    <td>{{ response.chain2 }}</td>
-                                    <td v-if="response.uniprot_id2 !== null"><ExternalLinks :accession="response.uniprot_id2" /></td>
-                                    <td v-else>N/A</td>
-                                    <td>
-                                        <dd v-if="response.tax_id2 == null">N/A</dd>
-                                        <dd v-else-if="!showTaxonomy">{{ response.tax_id2.name }}</dd>
-                                        <dd v-else>
-                                            <span v-for="(taxonomy, index) in response.rep_lineage2" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></span>
-                                        </dd>
-                                    </td>
-                                    <td class="caption grey--text text-truncate" style="max-width: 150px;">
-                                        <!-- TODO: CHANGE -->
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </template>
-                    </v-simple-table>
-                    <v-divider  style="margin-top:0.5em"></v-divider>
-
                     <h3 style="margin-top:1em">
                         Cluster summary
                         <v-tooltip top>
@@ -111,10 +55,66 @@
                             {{ response.lineage[0].name }}                            
                         </dd>
                         <dd v-else>
-                            <template v-for="(taxonomy, index) in response.lineage" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></template>
+                            <span v-for="(taxonomy, index) in response.lineage" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></span>
                         </dd>
                         </div>
                     </dl>
+                    <v-divider style="margin-top:0.5em"></v-divider>
+
+                    <div class="d-flex align-center justify-space-between mb-0">
+                        <!-- <h3 class="mb-0 mt-0">Representative Summary</h3> -->
+                        <h3>Representative: <ExternalLinks :accession="response.pdb_id.toUpperCase()" reference="PDB" /></h3>
+                    </div>
+                    <p class="mb-1 mt-0 text-body-1">
+                        {{ response.description }} | 
+                        {{ response.protein1_status == true ? "Protein" : "Peptide" }}-{{ response.protein2_status == true ? "Protein" : "Peptide" }} |
+                        {{ response.iftype1 == 2 ? "Ordered" : (response.iftype1 == 1 ? "Disordered" : "Unannotated") }}-{{ response.iftype2 == 2 ? "Ordered" : (response.iftype2 == 1 ? "Disordered" : "Unannotated") }} Interaction
+                    </p>
+
+                    <v-simple-table dense class="representative-table">
+                        <template v-slot:default>
+                            <thead>
+                                <tr>
+                                    <th class="text-left">Chain</th>
+                                    <th class="text-left">UniProt</th>
+                                    <th class="text-left">Taxonomy <v-btn plain text small icon @click="showTaxonomy = !showTaxonomy"><v-icon small>{{ showTaxonomy ? $MDI.ChevronLeft : $MDI.ChevronRight }}</v-icon></v-btn></th>
+                                    <th class="text-left">Gene Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-a">
+                                    <td>{{ response.chain1 }}</td>
+                                    <td v-if="response.uniprot_id1  !== null"><ExternalLinks :accession="response.uniprot_id1" /></td>
+                                    <td v-else>N/A</td>
+                                    <td>
+                                        <dd v-if="response.tax_id1 == null">N/A</dd>
+                                        <dd v-else-if="!showTaxonomy">{{ response.tax_id1.name }}</dd>
+                                        <dd v-else>
+                                            <span v-for="(taxonomy, index) in response.rep_lineage1"><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage1.length -1)"> &#187;&nbsp;</template></span>
+                                        </dd>
+                                    </td>
+                                    <td class="caption grey--text text-truncate" style="max-width: 150px;" :title="response.gene_name1 || 'N/A'">
+                                        {{ response.gene_name1 || 'N/A' }}
+                                    </td>
+                                </tr>
+                                <tr class="row-b">
+                                    <td>{{ response.chain2 }}</td>
+                                    <td v-if="response.uniprot_id2 !== null"><ExternalLinks :accession="response.uniprot_id2" /></td>
+                                    <td v-else>N/A</td>
+                                    <td>
+                                        <dd v-if="response.tax_id2 == null">N/A</dd>
+                                        <dd v-else-if="!showTaxonomy">{{ response.tax_id2.name }}</dd>
+                                        <dd v-else>
+                                            <span v-for="(taxonomy, index) in response.rep_lineage2" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage2.length -1)"> &#187;&nbsp;</template></span>
+                                        </dd>
+                                    </td>
+                                    <td class="caption grey--text text-truncate" style="max-width: 150px;" :title="response.gene_name2 || 'N/A'">
+                                        {{ response.gene_name2 || 'N/A' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </template>
+                    </v-simple-table>
                     <template v-if="response && response.warning == true">
                         <v-divider  style="margin-top:0.5em"></v-divider>
                         <h3 style="margin-top:1em; color: #F44336; text-decoration: underline;">

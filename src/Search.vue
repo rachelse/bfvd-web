@@ -75,15 +75,20 @@
                                     </div>
 
                                     <div v-if="queryAccessions.length < 2 && queryAccessions[0]" style="margin-bottom: 16px; margin-top: 0px">
-                                    <v-btn
+                                    <v-text-field
                                         outlined
+                                        hide-details
+                                        label="(Optional) UniProt Accession"
+                                        v-model="queryAccessions[1]"
+                                        :disabled="inSearch"
+                                        @keyup.enter="search"
+                                        @change="selectedExample = null"
+                                        @keydown="error = null"
+                                        :error="error != null"
+                                        :error-messages="error ? error : []"
                                         dark
-                                        small
-                                        @click="queryAccessions.push('')"
-                                    >
-                                        <v-icon left>{{ $MDI.PlusBox }}</v-icon>
-                                        Add Accession
-                                    </v-btn>
+                                        style="flex: 1;"
+                                    />
                                     </div>
                                 </div>
 

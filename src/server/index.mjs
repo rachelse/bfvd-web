@@ -44,7 +44,7 @@ const caDb = new DbReader();
 checkpoints.push(caDb.make(dataPath + '/interfaceclusterdb_ca', dataPath + '/interfaceclusterdb_ca.index'));
 
 const descDB = new DbReader();
-checkpoints.push(descDB.make(dataPath + '/pdb_desc', dataPath + '/pdb_desc.index'));
+checkpoints.push(descDB.make(dataPath + '/pdb_title', dataPath + '/pdb_title.index'));
 
 const avaDb = new DbReader();
 checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
@@ -681,6 +681,12 @@ app.get('/api/cluster/:cluster', async (req, res) => {
     if ( result.uniprot_id2 == "nan" || result.uniprot_id2 == "" ) {
         result.uniprot_id2 = null;
     }
+    if (result.gene_name1 == "") {
+        result.gene_name1 = null;
+    }
+    if (result.gene_name2 == "") {
+        result.gene_name2 = null;
+    }
 
     if (warnDB) {
         const warnKey = warnDB.id(result.intclu_rep_accession);
@@ -772,7 +778,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
     let total = 0;
     if (req.query.tax_id) {
         result = await sql.all(`
-        SELECT accession, pdb_id, chain1, chain2, uniprot_id1, uniprot_id2, tax_id1, tax_id2, flag
+        SELECT accession, pdb_id, chain1, chain2, uniprot_id1, uniprot_id2, gene_name1, gene_name2, tax_id1, tax_id2, flag
             FROM member
             WHERE intclu_rep_accession = ? ${flagFilter}
             ORDER BY rowid;
@@ -808,6 +814,12 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
                 x.uniprot_id2 = null;
             }
+            if (x.gene_name1 == "") {
+                x.gene_name1 = null;
+            }
+            if (x.gene_name2 == "") {
+                x.gene_name2 = null;
+            }
             return false;
         });
         
@@ -828,7 +840,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             paginate_query = "LIMIT ? OFFSET ?";
         }
         result = await sql.all(`
-        SELECT accession, pdb_id, chain1, chain2, uniprot_id1, uniprot_id2, tax_id1, tax_id2, flag
+        SELECT accession, pdb_id, chain1, chain2, uniprot_id1, uniprot_id2, gene_name1, gene_name2, tax_id1, tax_id2, flag
             FROM member
             WHERE intclu_rep_accession = ? ${flagFilter}
             ORDER BY rowid
@@ -843,6 +855,12 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
             }
             if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
                 x.uniprot_id2 = null;
+            }
+            if (x.gene_name1 == "") {
+                x.gene_name1 = null;
+            }
+            if (x.gene_name2 == "") {
+                x.gene_name2 = null;
             }
         });
     }
