@@ -261,6 +261,9 @@ export default {
         'cluster': { type: String, required: true },
         'second': { type: String, required: true },
         'secondPredicted': { type: Boolean, default: false },
+        // --- precomputed-transform prop (remove to revert) ---
+        'secondTransform': { type: Object, default: null },
+        // --- end precomputed-transform prop ---
         'toolbar': { type: Boolean, default: true },
         'bgColorLight': { type: String, default: Colors.white.hex },
         'bgColorDark': { type: String, default: Colors.black.hex },
@@ -425,6 +428,20 @@ export default {
                     [u[2][0], u[2][1], u[2][2], t[2]],
                     [0, 0, 0, 1]]
                 );
+
+                // --- BEGIN precomputed-transform override (remove block + secondTransform prop/watch to revert) ---
+                if (this.secondTransform && this.secondTransform.u && this.secondTransform.t) {
+                    const pu = this.secondTransform.u;
+                    const pt = this.secondTransform.t;
+                    mat = Mat4.ofRows([
+                        [pu[0], pu[1], pu[2], pt[0]],
+                        [pu[3], pu[4], pu[5], pt[1]],
+                        [pu[6], pu[7], pu[8], pt[2]],
+                        [0, 0, 0, 1]]
+                    );
+                    this.tmOutput = null;
+                }
+                // --- END precomputed-transform override ---
 
                 await this.plugin.build()
                     .to(this.secondComponent)
@@ -647,7 +664,12 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
         },
         'second': {
             handler: 'loadSecondStructure',
-        }
+        },
+        // --- precomputed-transform watcher (remove to revert) ---
+        'secondTransform': {
+            handler: 'loadSecondStructure',
+        },
+        // --- end precomputed-transform watcher ---
     },
     async mounted() {
         await this.initMolstar();

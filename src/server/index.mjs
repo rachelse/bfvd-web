@@ -107,6 +107,16 @@ for (const source of predictedSources) {
         };
         const tax1Node = resolveTax(f[8]);
         const tax2Node = resolveTax(f[9]);
+        // --- precomputed-transform: parse u (col 11) and t (col 12) from TSV (remove block + u,t entry fields to revert) ---
+        const parseFloatList = (s, n) => {
+            if (!s) return null;
+            const parts = s.split(',').map(parseFloat);
+            if (parts.length !== n || parts.some(isNaN)) return null;
+            return parts;
+        };
+        const u = parseFloatList(f[10], 9);
+        const t = parseFloatList(f[11], 3);
+        // --- end precomputed-transform ---
         const entry = {
             accession: baseAcc,
             description: '',
@@ -116,6 +126,10 @@ for (const source of predictedSources) {
             tax_id2: tax2Node,
             tm_score: parseFloat(f[6]),
             source: source.name,
+            // --- precomputed-transform fields (remove to revert) ---
+            u,
+            t,
+            // --- end precomputed-transform fields ---
         };
         let bucket = similarPredictionsByCluster.get(clusterId);
         if (!bucket) {

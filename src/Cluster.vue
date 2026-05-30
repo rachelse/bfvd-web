@@ -134,7 +134,8 @@
                     Representative structure
                 </template>
                 <template v-slot:content v-if="response">
-                    <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" :secondPredicted="secondPredicted" bgColorDark="#2e2e2e" @reset="second = ''; secondPredicted = false"></StructureViewer>
+                    <!-- precomputed-transform: bind :secondTransform + extend @reset; remove to revert -->
+                    <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" :secondPredicted="secondPredicted" :secondTransform="secondTransform" bgColorDark="#2e2e2e" @reset="second = ''; secondPredicted = false; secondTransform = null"></StructureViewer>
                 </template>
             </Panel>
         </v-col>
@@ -142,12 +143,14 @@
 
     <v-row class="mt-0">
         <v-col cols="12">
-            <Members :cluster="$route.params.cluster" @select="(accession) => { second = accession; secondPredicted = false; }"></Members>
+            <!-- precomputed-transform: extra `secondTransform = null` is the only addition; remove to revert -->
+            <Members :cluster="$route.params.cluster" @select="(accession) => { second = accession; secondPredicted = false; secondTransform = null; }"></Members>
         </v-col>
     </v-row>
 
     <v-flex xs12>
-        <SimilarPredictions :cluster="$route.params.cluster" @select="(accession) => { second = accession; secondPredicted = true; }"></SimilarPredictions>
+        <!-- precomputed-transform: second arg `transform` is the only addition; remove to revert -->
+        <SimilarPredictions :cluster="$route.params.cluster" @select="(accession, transform = null) => { second = accession; secondPredicted = true; secondTransform = transform; }"></SimilarPredictions>
     </v-flex>
 </v-container>
 </template>
@@ -180,6 +183,9 @@ export default {
             fetching: false,
             second: "",
             secondPredicted: false,
+            // --- precomputed-transform state (remove to revert) ---
+            secondTransform: null,
+            // --- end precomputed-transform state ---
             showLineage: false,
             showTaxonomy: false,
         }

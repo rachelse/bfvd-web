@@ -44,6 +44,26 @@
                 </div>
             </template>
 
+            <!-- --- precomputed-transform column (remove this template + header entry to revert) --- -->
+            <template v-slot:item.precomputed="prop">
+                <v-tooltip top>
+                    <template v-slot:activator="{ on }">
+                        <v-btn
+                            v-on="on"
+                            x-small
+                            outlined
+                            color="primary"
+                            :disabled="!(prop.item.u && prop.item.t)"
+                            @click="$emit('select', prop.item.accession, { u: prop.item.u, t: prop.item.t })"
+                        >
+                            Apply
+                        </v-btn>
+                    </template>
+                    <span>Superpose using precomputed transform</span>
+                </v-tooltip>
+            </template>
+            <!-- --- end precomputed-transform column --- -->
+
             <!-- Accession: source DB ID + description -->
             <template v-slot:item.accession="prop">
                 <span>{{ prop.item.accession }}</span><br>
@@ -121,6 +141,9 @@ export default {
                 { text: "Taxonomy",     value: "tax_id",    sortable: false, width: "15%" },
                 { text: "Interface TM-score", value: "tm_score",  sortable: true,  width: "15%" },
                 { text: "Source",       value: "source",    sortable: false, width: "10%" },
+                // --- precomputed-transform header (remove to revert) ---
+                { text: "Precomputed",  value: "precomputed", sortable: false, width: "10%" },
+                // --- end precomputed-transform header ---
             ],
             entries: [],
             totalEntries: 0,
