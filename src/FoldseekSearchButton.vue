@@ -15,7 +15,7 @@
         {{ error }}
     </div>
     <div v-if="inSearch && selectedChains" style="margin-top: 12px;">
-       Searching similar interfaces for Chain {{ selectedChains[0] }} and {{ selectedChains[1] }}
+       Searching similar predicted interfaces for Chain {{ selectedChains[0] }} and {{ selectedChains[1] }}
     </div>
     <div v-if="showChainSelection" style="margin-top: 12px; padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; background-color: transparent; width: fit-content; margin-left: auto; margin-right: auto;">
         <div style="margin-bottom: 8px; ">Select Chain Pair for Interface Search</div>

@@ -49,3 +49,99 @@ mv -f -- "ava_db.index_sort" "ava_db.index"
 LC_ALL=C sort -k1,1 "pdb_desc_full.index" > "pdb_desc_full.index_sort"
 mv -f -- "pdb_desc_full.index_sort" "pdb_desc_full.index"
 fi
+## humanPPI processing
+humanppi_aln=humanppiInt_against_pdbintrep_qtmabove0.4_or_ttmabove0.4
+humanppi_out=humanppi_similar_predictions.tsv
+
+# Process humanPPI alignment file into the format expected by the SimilarPredictions panel.
+#
+# Input columns (tab-separated):
+#   $1: query accession        e.g. Humanppi_A0A_S0__A0B_S0_A_B
+#   $2: target (our cluster)   e.g. 212320687DI_4unt-assembly1
+#   $3: query chain IDs        e.g. "A,B"  (comma-separated; single-chain matches have no comma)
+#   $4: target chain IDs       e.g. "G,H"  (same)
+#   $5: query TM-score
+#   $6: target TM-score
+#   $7: U rotation matrix      (9 comma-separated values, row-major)
+#   $8: T translation vector   (3 comma-separated values)
+#   $9: number of aligned residues (unused here)
+#
+# Output columns (tab-separated):
+#   1:  query_accession
+#   2:  cluster_id             (numeric cluster id, e.g. 212320687; the DI_<pdb>-assembly<n>
+#                               suffix from the target member accession is stripped so the
+#                               id matches cluster.intclu_rep_accession in the SQLite DB)
+#   3:  query_chain1
+#   4:  query_chain2
+#   5:  target_chain1
+#   6:  target_chain2
+#   7:  qtm
+#   8:  ttm
+#   9:  tax_id1                (NCBI tax id for chain 1; HumanPPI => 9606)
+#   10: tax_id2                (NCBI tax id for chain 2; HumanPPI => 9606)
+#   11: u_matrix               (9 values, comma-separated; may be dropped later)
+#   12: t_vector               (3 values, comma-separated; may be dropped later)
+awk -F"\t" 'BEGIN { OFS="\t"; tax1 = 9606; tax2 = 9606 }
+{
+    # Filter out single-chain matches: both query and target chains must contain a comma
+    if (index($3, ",") == 0 || index($4, ",") == 0) next;
+
+    split($3, qchains, ",");
+    split($4, tchains, ",");
+
+    # Strip the DI_<pdb>-assembly<n> suffix from the target accession so column 2
+    # is the bare cluster id that matches cluster.intclu_rep_accession.
+    cluster_id = $2;
+    sub(/DI_.*/, "", cluster_id);
+
+    print $1, cluster_id, qchains[1], qchains[2], tchains[1], tchains[2], $5, $6, tax1, tax2, $7, $8;
+}' "${humanppi_aln}" > "${humanppi_out}"
+
+echo "humanPPI: $(wc -l < "${humanppi_out}") dimer matches written to ${humanppi_out}"
+
+# Remap humanppi_dimer index keys (numeric IDs) to lookup names so DbReader can search by accession.
+# Keep backups of original numeric-key index files the first time.
+humanppi_lookup=humanppi_dimer.lookup
+humanppi_idx=humanppi_dimer.index
+humanppi_ca_idx=humanppi_dimer_ca.index
+
+remap_index_with_lookup() {
+    idx_file="$1"
+    lookup_file="$2"
+
+    if [ ! -f "${idx_file}" ] || [ ! -f "${lookup_file}" ]; then
+        echo "skip remap: missing ${idx_file} or ${lookup_file}"
+        return 0
+    fi
+
+    if [ ! -f "${idx_file}.numeric.bk" ]; then
+        cp "${idx_file}" "${idx_file}.numeric.bk"
+    fi
+
+    awk -F"\t" 'BEGIN { OFS="\t" }
+    NR==FNR {
+        # lookup: <numeric_id> <name> <file_id>
+        name[$1] = $2;
+        next;
+    }
+    {
+        # index: <numeric_id> <offset> <length>
+        if (!($1 in name)) {
+            missing++;
+            next;
+        }
+        print name[$1], $2, $3;
+    }
+    END {
+        if (missing > 0) {
+            printf("warning: %d keys in index had no lookup mapping\n", missing) > "/dev/stderr";
+        }
+    }' "${lookup_file}" "${idx_file}.numeric.bk" \
+    | LC_ALL=C sort -t $'\t' -k1,1 > "${idx_file}.tmp"
+
+    mv -f -- "${idx_file}.tmp" "${idx_file}"
+    echo "remapped + sorted ${idx_file}"
+}
+
+remap_index_with_lookup "${humanppi_idx}" "${humanppi_lookup}"
+remap_index_with_lookup "${humanppi_ca_idx}" "${humanppi_lookup}"

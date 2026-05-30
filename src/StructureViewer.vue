@@ -260,6 +260,7 @@ export default {
     props: {
         'cluster': { type: String, required: true },
         'second': { type: String, required: true },
+        'secondPredicted': { type: Boolean, default: false },
         'toolbar': { type: Boolean, default: true },
         'bgColorLight': { type: String, default: Colors.white.hex },
         'bgColorDark': { type: String, default: Colors.black.hex },
@@ -387,13 +388,19 @@ export default {
             }
 
             try {
-                const response = await this.$axios.get("/chainid/" + this.second);
-                if (!response || !response.data) return;
-                const secondStructure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id);
-                this.secondChainName = {
-                    A: response.data.chain1,
-                    B: response.data.chain2,
-                };
+                let secondStructure;
+                if (this.secondPredicted) {
+                    secondStructure = await this.fetchDimerStructure(this.second + '_A', this.second + '_B', true);
+                    this.secondChainName = { A: this.second + '_A', B: this.second + '_B' };
+                } else {
+                    const response = await this.$axios.get("/chainid/" + this.second);
+                    if (!response || !response.data) return;
+                    secondStructure = await this.fetchDimerStructure(response.data.chain1_id, response.data.chain2_id);
+                    this.secondChainName = {
+                        A: response.data.chain1,
+                        B: response.data.chain2,
+                    };
+                }
                 this.secondComponent = secondStructure;
 
                 const { chain1, chain2, interface1, interface2 } = await this.getStructureComponents(secondStructure);
@@ -583,10 +590,11 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
             return structure
         },
 
-        async fetchDimerStructure(id1, id2) {
+        async fetchDimerStructure(id1, id2, predicted = false) {
+            const path = predicted ? "/structure-predicted/" : "/structure/";
             const [r1, r2] = await Promise.all([
-                this.$axios.get("/structure/" + id1),
-                this.$axios.get("/structure/" + id2)
+                this.$axios.get(path + id1),
+                this.$axios.get(path + id2)
             ]);
             let pdb1 = await pulchra(mockPDB(r1.data.coordinates, r1.data.seq));
             let pdb2 = await pulchra(mockPDB(r2.data.coordinates, r2.data.seq));

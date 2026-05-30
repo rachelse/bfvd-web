@@ -6,7 +6,7 @@ import cors from 'cors';
 import axios from 'axios';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 
 import DbReader from './dbreader.mjs';
 import read from './compressed_ca.mjs';
@@ -46,16 +46,88 @@ checkpoints.push(caDb.make(dataPath + '/interfaceclusterdb_ca', dataPath + '/int
 const descDB = new DbReader();
 checkpoints.push(descDB.make(dataPath + '/pdb_title', dataPath + '/pdb_title.index'));
 
-const avaDb = new DbReader();
-checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
-
 let warnDB = null;
 if (existsSync(dataPath + '/warning_db')) {
     warnDB = new DbReader();
     checkpoints.push(warnDB.make(dataPath + '/warning_db', dataPath + '/warning_db.index'));
 }
 
+const predictedSourceConfigs = [
+    {
+        name: 'HumanPPI',
+        prefix: 'Humanppi_',
+        aaDbBase: dataPath + '/humanppi_dimer',
+        caDbBase: dataPath + '/humanppi_dimer_ca',
+        tsvPath:  dataPath + '/humanppi_similar_predictions.tsv',
+    },
+];
+
+const predictedSources = [];
+for (const cfg of predictedSourceConfigs) {
+    const source = { name: cfg.name, prefix: cfg.prefix || '', aaDb: null, caDb: null, tsvPath: cfg.tsvPath };
+    if (cfg.aaDbBase && existsSync(cfg.aaDbBase) && existsSync(cfg.aaDbBase + '.index')) {
+        source.aaDb = new DbReader();
+        checkpoints.push(source.aaDb.make(cfg.aaDbBase, cfg.aaDbBase + '.index'));
+    }
+    if (cfg.caDbBase && existsSync(cfg.caDbBase) && existsSync(cfg.caDbBase + '.index')) {
+        source.caDb = new DbReader();
+        checkpoints.push(source.caDb.make(cfg.caDbBase, cfg.caDbBase + '.index'));
+    }
+    predictedSources.push(source);
+}
+
 await Promise.all(checkpoints);
+console.timeLog();
+
+// In-memory index of predicted similar dimers, grouped by cluster id.
+const similarPredictionsByCluster = new Map();
+for (const source of predictedSources) {
+    if (!source.tsvPath || !existsSync(source.tsvPath)) continue;
+    console.log(`Loading predicted similar dimers from ${source.name}...`);
+    const raw = readFileSync(source.tsvPath, 'utf8');
+    let count = 0;
+    for (const line of raw.split('\n')) {
+        if (!line) continue;
+        const f = line.split('\t');
+        if (f.length < 8) continue;
+        const clusterId = f[1];
+        // Strip the optional source-specific prefix so the accession is a key
+        // into the source's structure DB (`<base>_A`, `<base>_B`).
+        const baseAcc = source.prefix
+            ? f[0].replace(new RegExp('^' + source.prefix), '')
+            : f[0];
+        const m = baseAcc.match(/^(.+?)_S\d+__(.+?)_S\d+_A_B$/);
+        // Columns 9-10: tax_id1, tax_id2. Resolve through the NCBI taxonomy
+        // tree the same way other endpoints do, so the UI gets {id,name} nodes.
+        const resolveTax = (raw) => {
+            if (!raw) return null;
+            const n = parseInt(raw, 10);
+            if (isNaN(n) || !tree.nodeExists(n)) return null;
+            return tree.getNode(n);
+        };
+        const tax1Node = resolveTax(f[8]);
+        const tax2Node = resolveTax(f[9]);
+        const entry = {
+            accession: baseAcc,
+            description: '',
+            uniprot_id1: m ? m[1] : null,
+            uniprot_id2: m ? m[2] : null,
+            tax_id1: tax1Node,
+            tax_id2: tax2Node,
+            tm_score: parseFloat(f[6]),
+            source: source.name,
+        };
+        let bucket = similarPredictionsByCluster.get(clusterId);
+        if (!bucket) {
+            bucket = [];
+            similarPredictionsByCluster.set(clusterId, bucket);
+        }
+        bucket.push(entry);
+        count++;
+    }
+    console.log(`  ${source.name}: loaded ${count} predictions`);
+}
+console.log(`predicted similar dimers indexed for ${similarPredictionsByCluster.size} clusters`);
 console.timeLog();
 
 function getDescription(accession) {
@@ -707,63 +779,6 @@ function processAndWriteInChunks(data, chunkSize, processingFunc, writeFunc) {
     }
 }
 
-function parseAvaRows(avaRaw) {
-    // RACHEL TODO: decide which criteria to use for filtering similar clusters
-    const rows = avaRaw
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .map((line) => line.split(/\s+/));
-
-    const scoreKeysByLength = {
-        1: ['evalue'],
-        7: ['qtm', 'ttm', 'qcov', 'tcov', 'qchaintm', 'tchaintm', 'intlddt'],
-        8: ['evalue', 'qtm', 'ttm', 'qcov', 'tcov', 'qchaintm', 'tchaintm', 'intlddt'],
-    };
-
-    const scoreByAccession = new Map();
-    const accessions = [];
-    const seenAccessions = new Set();
-
-    rows.forEach((cols) => {
-        const accession = cols[0];
-        if (!accession) {
-            return;
-        }
-
-        if (!seenAccessions.has(accession)) {
-            seenAccessions.add(accession);
-            accessions.push(accession);
-        }
-
-        const values = cols.slice(1);
-        const scoreKeys = scoreKeysByLength[values.length];
-        const scores = {};
-
-        if (scoreKeys) {
-            for (let i = 0; i < scoreKeys.length; i++) {
-                const sc = scoreKeys[i];
-                if (sc === 'qchaintm' || sc === 'tchaintm') {
-                    scores[sc] = values[i].split(',').map((x) => parseFloat(x));
-                } else {
-                    scores[scoreKeys[i]] = parseFloat(values[i]);
-                }
-            }
-        } else {
-            for (let i = 0; i < values.length; i++) {
-                scores[`score${i + 1}`] = parseFloat(values[i]);
-            }
-            if (values.length > 0) {
-                scores.evalue = parseFloat(values[0]);
-            }
-        }
-
-        scoreByAccession.set(accession, scores);
-    });
-
-    return { accessions, scoreByAccession };
-}
-
 app.get('/api/cluster/:cluster/members', async (req, res) => {
     let flagFilter = '';
     let args = [ req.params.cluster ];
@@ -973,191 +988,6 @@ app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
     res.send(Object.values(suggestions));
 });
 
-app.get('/api/cluster/:cluster/similars', async (req, res) => {
-    const cluster = req.params.cluster;
-    const avaKey = avaDb.id(cluster);
-    if (avaKey.found == false) {
-        res.send([]);
-        return;
-    }
-    const ava = avaDb.data(avaKey.value).toString('ascii');
-    const { accessions, scoreByAccession } = parseAvaRows(ava);
-    if (accessions.length === 0) {
-        res.send([]);
-        return;
-    }
-    let result = await sql.all(`
-    SELECT *
-        FROM cluster
-        JOIN member ON cluster.intclu_rep_accession = member.accession
-        WHERE cluster.intclu_rep_accession IN (${accessions.map(() => "?").join(",")});
-    `, accessions);
-    result.forEach((x) => {
-        const scores = scoreByAccession.get(x.intclu_rep_accession) || {};
-        Object.assign(x, scores);
-        x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
-        x.description = getDescription(x.intclu_rep_accession);
-        if (x.uniprot_id1 == "nan" || x.uniprot_id1 == "") {
-            x.uniprot_id1 = null;
-        }
-        if (x.uniprot_id2 == "nan" || x.uniprot_id2 == "") {
-            x.uniprot_id2 = null;
-        }
-    });
-
-    if (req.query.tax_id) {
-        result = result.filter((x) => {
-            let currNode = x.lca_tax_id;
-            if (currNode == null) {
-                return false;
-            }
-            while (currNode.id != 1) {
-                if (currNode.id == req.query.tax_id) {
-                    return true;
-                }
-                currNode = tree.getNode(currNode.parent);
-            }
-            return false;
-        });
-    }
-
-    if (!req.query.format) {
-        let sortBy = req.query.sortBy;
-        let sortDesc = req.query.sortDesc.toLowerCase() === "true";
-        if (sortBy == "") {
-            sortBy = "qtm";
-            sortDesc = true;
-        }
-
-        const identity = (x) => x;
-        let castFun = identity;
-        if (sortBy == 'qtm') {
-            castFun = parseFloat;
-        }
-        let sorted = result.sort((a, b) => {
-            const sortA = castFun(a[sortBy]);
-            const sortB = castFun(b[sortBy]);
-            
-            if (sortDesc) {
-                if (sortA < sortB) return 1;
-                if (sortA > sortB) return -1;
-                return 0;
-            } else {
-                if (sortA < sortB) return -1;
-                if (sortA > sortB) return 1;
-                return 0;
-            }
-        })
-        sorted = sorted.filter((x) => x.intclu_rep_accession != cluster);
-        const total = sorted.length;
-        sorted = sorted.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
-        res.send({ total: total, similars: sorted });
-        return;
-    } else {
-    }
-
-    const safeCluster = req.params.cluster.replace(/[^a-zA-Z0-9]/g, '');
-    switch(req.query.format) {
-        case 'accessions':
-            res.setHeader('Content-Disposition', `attachment; filename=similar-accessions-${safeCluster}.txt`);
-            res.setHeader('Content-Type', 'text/plain');
-            res.charset = 'UTF-8';
-            processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => similar.intclu_rep_accession).join('\n'),
-                chunk => res.write(chunk));
-            res.end();
-            break;
-
-        case 'fasta':
-            res.setHeader('Content-Disposition', `attachment; filename=similar-sequences-${safeCluster}.fasta`);
-            res.setHeader('Content-Type', 'text/plain');
-            res.charset = 'UTF-8';
-
-            processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => `>${similar.intclu_rep_accession} ${similar.description.trimEnd()} OX=${similar.lca_tax_id ? similar.lca_tax_id.id : '0'} OS=${similar.lca_tax_id ? similar.lca_tax_id.name : 'unknown'} Eval=${similar.evalue}\n${aaDb.data(aaDb.id(similar.intclu_rep_accession).value).toString('ascii')}`).join(''),
-                chunk => res.write(chunk));
-
-            res.end();
-            break;
-        case 'summary':
-            res.setHeader('Content-Disposition', `attachment; filename=similars-summary-${safeCluster}.tsv`);
-            res.setHeader('Content-Type', 'text/plain');
-            res.charset = 'UTF-8';
-            
-            const headers = ['accession', 'description', 'pdb_id', 'chainA', 'chainB', 'uniprot_idA', 'uniprot_idB', 'lca_tax_id', 'tm-score', 'chainA_tm-score', 'chainB_tm-score', 'interface_lddt'];
-            res.write(headers.join('\t') + '\n');
-            
-            processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(c => {
-                    return [
-                        c.accession,
-                        c.description, // Passed raw, handled safely below
-                        c.pdb_id,
-                        c.chain1,
-                        c.chain2,
-                        c.uniprot_id1,
-                        c.uniprot_id2,
-                        c.lca_tax_id ? c.lca_tax_id.id : '',
-                        c.qtm,
-                        c.qchaintm[0],
-                        c.qchaintm[1],
-                        c.intlddt
-                    ]
-                    // Clean nulls, newlines, carriage returns, and tabs all at once
-                    .map(val => String(val || '').replace(/[\r\n\t]+/g, ' '))
-                    .join('\t');
-                }).join('\n') + '\n',
-                chunk => res.write(chunk)
-            );
-            res.end();
-            break;
-        
-        default:
-            res.status(400).send({ error: 'Unsupported format!' });
-            break;
-    }
-});
-
-app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => {
-    const cluster = req.params.cluster;
-    const avaKey = avaDb.id(cluster);
-    if (avaKey.found == false) {
-        res.send([]);
-        return;
-    }
-    const ava = avaDb.data(avaKey.value).toString('ascii');
-    const { accessions } = parseAvaRows(ava);
-    if (accessions.length === 0) {
-        res.send([]);
-        return;
-    }
-    let result = await sql.all(`
-    SELECT *
-        FROM cluster
-        WHERE intclu_rep_accession IN (${accessions.map(() => "?").join(",")});
-    `, accessions);
-    let suggestions = {};
-    let count = 0;
-    result.forEach((x) => {
-        if (tree.nodeExists(x.lca_tax_id) == false) {
-            return;
-        }
-        let node = tree.getNode(x.lca_tax_id);
-        while (node.id != 1) {
-            if (node.id in suggestions || count >= 10) {
-                break;
-            }
-            if (node.name.toLowerCase().includes(req.params.suggest.toLowerCase())) {
-                suggestions[node.id] = node;
-                count++;
-            }
-            node = tree.getNode(node.parent);
-        }
-    });
-    res.send(Object.values(suggestions));
-});
-
-
 app.get('/api/structure/:structure', async (req, res) => {
     const structure = req.params.structure;
     const aaKey = aaDb.id(structure);
@@ -1182,6 +1012,63 @@ app.get('/api/structure/:structure', async (req, res) => {
     const ca = caDb.data(key.value);
     const result = Array.from(read(ca, aaLength, size)).map((x) => x.toFixed(3));
     res.send({ seq: aa, coordinates: result, plddt: null });
+});
+
+app.get('/api/structure-predicted/:structure', async (req, res) => {
+    const structure = req.params.structure;
+    for (const source of predictedSources) {
+        if (!source.aaDb || !source.caDb) continue;
+        const aaKey = source.aaDb.id(structure);
+        if (aaKey.found == false) continue;
+        const caKey = source.caDb.id(structure);
+        if (caKey.found == false) continue;
+
+        const aaLength = source.aaDb.length(aaKey.value) - 2;
+        const size = source.caDb.length(caKey.value);
+        const aa = source.aaDb.data(aaKey.value).toString('ascii');
+        const ca = source.caDb.data(caKey.value);
+        const result = Array.from(read(ca, aaLength, size)).map((x) => x.toFixed(3));
+        res.send({ seq: aa, coordinates: result, plddt: null, source: source.name });
+        return;
+    }
+    res.status(404).send({ error: `${structure} not found in any predicted structure db` });
+});
+
+app.get('/api/cluster/:cluster/similar-predictions', async (req, res) => {
+    const cluster = req.params.cluster;
+    const bucket = similarPredictionsByCluster.get(cluster) || [];
+
+    // Sort: default by tm_score desc, otherwise honor ?sort=<field>&order=asc|desc
+    const sortField = req.query.sort || 'tm_score';
+    const sortDesc = (req.query.order || 'desc').toLowerCase() !== 'asc';
+    const sorted = bucket.slice().sort((a, b) => {
+        const av = a[sortField];
+        const bv = b[sortField];
+        const an = av == null ? -Infinity : av;
+        const bn = bv == null ? -Infinity : bv;
+        if (an < bn) return sortDesc ? 1 : -1;
+        if (an > bn) return sortDesc ? -1 : 1;
+        return 0;
+    });
+
+    if (req.query.format === 'summary') {
+        const safeCluster = cluster.replace(/[^a-zA-Z0-9]/g, '');
+        res.setHeader('Content-Disposition', `attachment; filename=similar-predictions-${safeCluster}.tsv`);
+        res.setHeader('Content-Type', 'text/plain');
+        const headers = ['accession', 'uniprot_id1', 'uniprot_id2', 'tm_score', 'source'];
+        res.write(headers.join('\t') + '\n');
+        for (const e of sorted) {
+            res.write([e.accession, e.uniprot_id1 || '', e.uniprot_id2 || '', e.tm_score, e.source].join('\t') + '\n');
+        }
+        res.end();
+        return;
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const total = sorted.length;
+    const paged = limit < 0 ? sorted : sorted.slice((page - 1) * limit, page * limit);
+    res.send({ total, result: paged });
 });
 
 app.get('/api/chainid/:accession', async (req, res) => {
