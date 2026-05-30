@@ -10,7 +10,7 @@ import { colors } from 'vuetify/lib';
 import * as Colors from './Colors.js';
 
 export default {
-    name: "Fragment",
+    name: "ClusterLevel",
     props: ["flag"],
     computed: {
         flagText() {

@@ -64,7 +64,7 @@
             </div>
         </template>
         <template v-slot:item.flag="prop">
-            <Fragment :flag="prop.value"></Fragment>
+            <ClusterLevel :flag="prop.value"></ClusterLevel>
         </template>
         <template v-slot:header.flag="{ header }">
             <v-menu
@@ -97,9 +97,9 @@
                 <v-card style="padding: 2em; width: 250px;">
                     <h3>Filter by</h3>
                     <v-chip-group column v-model="options.flagFilter">
-                        <Fragment :flag="1"></Fragment>
-                        <Fragment :flag="2"></Fragment>
-                        <Fragment :flag="3"></Fragment>
+                        <ClusterLevel :flag="1"></ClusterLevel>
+                        <ClusterLevel :flag="2"></ClusterLevel>
+                        <ClusterLevel :flag="3"></ClusterLevel>
                     </v-chip-group>
                 </v-card>
             </v-menu>
@@ -137,7 +137,7 @@ import TaxSpan from "./TaxSpan.vue";
 import StructureViewer from "./StructureViewer.vue";
 import ExternalLinks from "./ExternalLinks.vue";
 import TaxonomyAutocomplete from "./TaxonomyAutocomplete.vue";
-import Fragment from "./Fragment.vue";
+import ClusterLevel from "./ClusterLevel.vue";
 import Sankey from './Sankey.vue';
 import ImageMixin from './ImageMixin';
 import Panel from "./Panel.vue";
@@ -150,7 +150,7 @@ export default {
         StructureViewer,
         ExternalLinks,
         TaxonomyAutocomplete,
-        Fragment,
+        ClusterLevel,
         Sankey,
     },
     props: ["cluster"],
