@@ -64,16 +64,6 @@
             </template>
             <!-- --- end precomputed-transform column --- -->
 
-            <!-- Accession: source DB ID + description -->
-            <template v-slot:item.accession="prop">
-                <span>{{ prop.item.accession }}</span><br>
-                <span
-                    class="caption text--darken-1"
-                    :title="prop.item.description || ''"
-                    style="display: inline-block; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;"
-                >{{ prop.item.description }}</span>
-            </template>
-
             <!-- UniProt IDs per chain -->
             <template v-slot:item.uniprot="prop">
                 <div>
@@ -97,6 +87,9 @@
             <!-- Alignment scores -->
             <template v-slot:item.tm_score="prop">
                 {{ prop.item.tm_score != null ? prop.item.tm_score.toFixed(3) : 'N/A' }}
+            </template>
+            <template v-slot:item.tm_score_target="prop">
+                {{ prop.item.tm_score_target != null ? prop.item.tm_score_target.toFixed(3) : 'N/A' }}
             </template>
 
             <!-- Source badge (styled like ClusterLevel: outlined colored chip) -->
@@ -135,12 +128,12 @@ export default {
     data() {
         return {
             headers: [
-                { text: "Structure",    value: "structure", sortable: false, width: "10%" },
-                { text: "Accession",    value: "accession", sortable: false, width: "25%" },
+                { text: "Structure",    value: "structure", sortable: false, width: "12%" },
                 { text: "UniProt ID",   value: "uniprot",   sortable: false, width: "15%" },
-                { text: "Taxonomy",     value: "tax_id",    sortable: false, width: "15%" },
-                { text: "Interface TM-score", value: "tm_score",  sortable: true,  width: "15%" },
-                { text: "Source",       value: "source",    sortable: false, width: "10%" },
+                { text: "Taxonomy",     value: "tax_id",    sortable: false, width: "20%" },
+                { text: "Cluster TM-score", value: "tm_score_target", sortable: true, width: "13%" },
+                { text: "Source TM-score",  value: "tm_score",        sortable: true, width: "13%" },
+                { text: "Source",       value: "source",    sortable: false, width: "12%" },
                 // --- precomputed-transform header (remove to revert) ---
                 { text: "Precomputed",  value: "precomputed", sortable: false, width: "10%" },
                 // --- end precomputed-transform header ---

@@ -125,6 +125,7 @@ for (const source of predictedSources) {
             tax_id1: tax1Node,
             tax_id2: tax2Node,
             tm_score: parseFloat(f[6]),
+            tm_score_target: parseFloat(f[7]),
             source: source.name,
             // --- precomputed-transform fields (remove to revert) ---
             u,
