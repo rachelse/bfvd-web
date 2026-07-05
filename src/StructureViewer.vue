@@ -84,8 +84,8 @@
                     v-on:click="updateStructureMode()"
                     title="Switch between showing only the interface, highlighting the interface, or showing the whole structure"
                 >
-                    <v-icon v-bind="tbIconBindings">{{ structureMode == 0 ? $MDI.CircleOpacity : (structureMode == 1 ? $MDI.CircleHalf : $MDI.Circle) }}</v-icon>
-                    <span v-if="isFullscreen">&nbsp;{{ structureMode == 0 ? 'Highlight Interface' : (structureMode == 1 ? 'Only Interface' : 'Whole Structure') }}</span>
+                    <v-icon v-bind="tbIconBindings">{{ structureMode == 0 ? $MDI.CircleHalf : (structureMode == 1 ? $MDI.CircleOpacity : $MDI.Circle) }}</v-icon>
+                    <span v-if="isFullscreen">&nbsp;{{ structureMode == 0 ? 'Only Interface' : (structureMode == 1 ? 'Highlight Interface' : 'Whole Structure') }}</span>
                 </v-btn>
                 </v-item-group>
             </div>
@@ -255,7 +255,7 @@ export default {
         col2: Colors.aquaBlue, 
         seccol1: Colors.lightPurple,
         seccol2: Colors.skyblue,
-        structureMode: 0, // 0: highlight interface, 1: only interface, 2: whole structure
+        structureMode: 0, // 0: only interface, 1: highlight interface, 2: whole structure
     }),
     props: {
         'cluster': { type: String, required: true },
@@ -451,10 +451,10 @@ export default {
                     .commit();
 
                 if (this.structureMode === 0) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2, chain1, chain2, this.second);
-                    this.focusInterface();
-                } else if (this.structureMode === 1) {
                     await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2, null, null, this.second);
+                } else if (this.structureMode === 1) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, interface1, interface2, chain1, chain2, this.second);
+                    this.focusInterface();                    
                 } else if (this.structureMode === 2) {
                     await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, chain1, chain2, null, null, this.second);
                 }
@@ -471,7 +471,7 @@ export default {
                 this.$emit('reset', null);
             }
 
-            if (this.structureMode === 0) {
+            if (this.structureMode === 1) {
                 this.focusInterface();
             } else {
                 this.plugin?.managers.camera.reset();
@@ -573,11 +573,11 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
                 await update.commit();
             }
             if ( this.structureMode === 0) {
-                // Default: Show whole structure (transparent) with interface highlighted
-                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2, this.cluster);
-            } else if (this.structureMode === 1) {
                 // Show only interface
                 await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, null, null, this.cluster);
+            } else if (this.structureMode === 1) {
+                // Show whole structure (transparent) with interface highlighted
+                await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2, this.cluster);
             } else if (this.structureMode === 2) {
                 // Show whole structure
                 await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.chain1, this.chain2, null, null, this.cluster);
@@ -585,9 +585,9 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
 
             if (this.secondComponent) {
                 if ( this.structureMode === 0) {
-                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2, this.secondChain1, this.secondChain2, this.second);
-                } else if (this.structureMode === 1) {
                     await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2, null, null, this.second);
+                } else if (this.structureMode === 1) {
+                    await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondInterface1, this.secondInterface2, this.secondChain1, this.secondChain2, this.second);
                 } else if (this.structureMode === 2) {
                     await addStructureRepresentation(this.plugin, this.seccol1.hex, this.seccol2.hex, this.secondChain1, this.secondChain2, null, null, this.second);
                 }
