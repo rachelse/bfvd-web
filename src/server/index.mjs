@@ -454,20 +454,22 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
                     
                     for (let j = 0; j < result.alignments[0].length; j++) {
                         const target = result.alignments[0][j].target;
-                        
-                        let accession = "";
-                        try {
-                            accession = target.match(/(\d+)DI/)[1];
-                        } catch (e) {
-                            console.log("error retrieving accession: ", target);
-                            accession = "error-retrieving-accession";
+
+                        // target = "<pdb>-assembly<n>_<c1>_<c2>[_<resultChain>] [description]"
+                        const targetId = target.split(/\s+/, 1)[0];
+                        const m = targetId.match(/^([A-Za-z0-9]{4}-assembly\d+)_([A-Za-z0-9]+)_([A-Za-z0-9]+)(?:_[A-Za-z0-9]+)?$/);
+                        if (!m) {
+                            console.log("error parsing target: ", target);
+                            continue;
                         }
+                        const [c1, c2] = m[2] <= m[3] ? [m[2], m[3]] : [m[3], m[2]];
+                        const foldseek_key = `${m[1].toLowerCase()}_${c1}_${c2}`;
                         // TODO: decide filtering criteria
                         // if (result.alignments[0][j].prob < 0.95) {
                         //     continue;
                         // }
                         results.push({
-                            accession: accession,
+                            foldseek_key,
                             eval: result.alignments[0][j].eval,
                             score: result.alignments[0][j].score,
                             seqId: result.alignments[0][j].seqId,
@@ -479,11 +481,10 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
                     }
                 }
             }
-            
+
             fileCache.add(jobid, JSON.stringify(results));
         } catch (error) {
             console.error("Error fetching results from Foldseek API for jobid:", jobid, error.message);
-            // TODO: Add no result found handling on the frontend for this case
             if (error.response && error.response.data) {
                 console.error("API error response:", error.response.data);
             }
@@ -504,7 +505,11 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
     let queries_where = [];
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
 
-    const accessions = results.map(r => r.accession);
+    const foldseekKeys = results.map(r => r.foldseek_key);
+    if (foldseekKeys.length == 0) {
+        // no results found, return empty result set
+        return finalizeResult([], req, res);
+    }
     let result = await sql.all(`
         SELECT DISTINCT *
             FROM cluster as c
@@ -512,9 +517,9 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
             WHERE c.intclu_rep_accession in (
                 SELECT DISTINCT intclu_rep_accession
                 FROM member
-                WHERE accession IN (${accessions.map(() => '?').join(',')})
+                WHERE foldseek_key IN (${foldseekKeys.map(() => '?').join(',')})
             ) AND ${queries_where.join(" AND ")}
-            `, ...accessions, ...filter_params);
+            `, ...foldseekKeys, ...filter_params);
     return finalizeResult(result, req, res);
 });
 

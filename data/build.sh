@@ -15,6 +15,7 @@ CREATE TABLE member (
 	uniprot_id1 TEXT,
 	uniprot_id2 TEXT,
 	pdb_id TEXT,
+	assembly_id INTEGER,
 	chain1 TEXT,
 	chain2 TEXT,
 	chain1_id TEXT,
@@ -24,7 +25,9 @@ CREATE TABLE member (
 	iftype1 INTEGER,
 	iftype2 INTEGER,
 	gene_name1 TEXT,
-	gene_name2 TEXT
+	gene_name2 TEXT,
+	-- Canonicalized foldseek target key: <pdb>-assembly<n>_<c1>_<c2> with c1<=c2 (lex).
+	foldseek_key TEXT
 );
 
 CREATE TABLE cluster (
@@ -97,22 +100,29 @@ CREATE TABLE tmpCluster (
 .import "${2}" tmpMember
 .import "${3}" tmpCluster
 
--- Process names
-UPDATE tmpMember
-SET pdb_id = SUBSTR(pdb_id, 1, INSTR(pdb_id, '-assembly') - 1);
-
--- Insert members & index on accession
+-- Insert members & index on accession.
+-- Source pdb_id is "<pdb>-assembly<n>"; split into pdb_id and assembly_id here.
+-- foldseek_key stores the canonicalized foldseek target
 INSERT INTO member (accession, diclu_rep_accession, intclu_rep_accession, flag, 
-					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, 
-					chain1, chain2, chain1_id, chain2_id, gene_name1, gene_name2, protein1_status, protein2_status, iftype1, iftype2)
+					tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, assembly_id,
+					chain1, chain2, chain1_id, chain2_id, gene_name1, gene_name2, protein1_status, protein2_status, iftype1, iftype2,
+					foldseek_key)
 SELECT mem_id, diclu_id, intclu_id, flag, 
-		tax_id1, tax_id2, uniprot_id1, uniprot_id2, pdb_id, 
-		chain1, chain2, chain1_id, chain2_id, gene_name1, gene_name2, protein1_status, protein2_status, iftype1, iftype2
+		tax_id1, tax_id2, uniprot_id1, uniprot_id2,
+		SUBSTR(pdb_id, 1, INSTR(pdb_id, '-assembly') - 1),
+		CAST(SUBSTR(pdb_id, INSTR(pdb_id, '-assembly') + 9) AS INTEGER),
+		chain1, chain2, chain1_id, chain2_id, gene_name1, gene_name2, protein1_status, protein2_status, iftype1, iftype2,
+		pdb_id || '_' ||
+			CASE WHEN chain1 <= chain2 THEN chain1 || '_' || chain2 ELSE chain2 || '_' || chain1 END
 FROM tmpMember;
 
 -- Index on member accessions
 CREATE INDEX member_acc_idx
 ON member(accession);
+
+-- Index for foldseek target lookups
+CREATE INDEX member_foldseek_key_idx
+ON member(foldseek_key);
 
 -- Index on member representative accessions
 CREATE INDEX member_rep_idx

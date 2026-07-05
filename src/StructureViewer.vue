@@ -693,7 +693,7 @@ REMARK         * Residue/atom indices were sequentially renumbered`;
             this.chain2 = chain2;
             this.interface1 = interface1;
             this.interface2 = interface2;
-            await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, this.chain1, this.chain2, this.cluster);
+            await addStructureRepresentation(this.plugin, this.col1.hex, this.col2.hex, this.interface1, this.interface2, null, null, this.cluster);
             
 
             if (this.second && this.second !== "") {
