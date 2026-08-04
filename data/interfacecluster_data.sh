@@ -50,7 +50,8 @@ LC_ALL=C sort -k1,1 "pdb_desc_full.index" > "pdb_desc_full.index_sort"
 mv -f -- "pdb_desc_full.index_sort" "pdb_desc_full.index"
 fi
 ## humanPPI processing
-humanppi_aln=humanppiInt_against_pdbintrep_qtmabove0.4_or_ttmabove0.4
+humanppi_aln=13subdb_twochainmatched
+# humanppi_aln=humanppiInt_against_pdbintrep_qtmabove0.4_or_ttmabove0.4
 humanppi_out=humanppi_similar_predictions.tsv
 
 # Process humanPPI alignment file into the format expected by the SimilarPredictions panel.
@@ -81,6 +82,7 @@ humanppi_out=humanppi_similar_predictions.tsv
 #   10: tax_id2                (NCBI tax id for chain 2; HumanPPI => 9606)
 #   11: u_matrix               (9 values, comma-separated; may be dropped later)
 #   12: t_vector               (3 values, comma-separated; may be dropped later)
+if false; then
 awk -F"\t" 'BEGIN { OFS="\t"; tax1 = 9606; tax2 = 9606 }
 {
     # Filter out single-chain matches: both query and target chains must contain a comma
@@ -95,9 +97,15 @@ awk -F"\t" 'BEGIN { OFS="\t"; tax1 = 9606; tax2 = 9606 }
     sub(/DI_.*/, "", cluster_id);
 
     print $1, cluster_id, qchains[1], qchains[2], tchains[1], tchains[2], $5, $6, tax1, tax2, $7, $8;
-}' "${humanppi_aln}" > "${humanppi_out}"
+}' "${humanppi_aln}" > "${humanppi_out}.tmp"
 
+awk -F"\t" 'BEGIN { OFS="\t" }
+NR==FNR {split($2, name, "_"); di[$3]=name[1]"_"name[2]"_"name[3]"_"name[4]"_"name[5]"_"name[6]"_"name[7]; next} 
+NR!=FNR && $0~/^Humanppi_/ {exit 0}
+NR!=FNR {split($1, id, "_Humanppi"); $1="Humanppi_" di[substr(id[1], 3, length(id[1]))]; print $0}
+' humanppi_dimer.lookup "${humanppi_out}.tmp" > "${humanppi_out}"
 echo "humanPPI: $(wc -l < "${humanppi_out}") dimer matches written to ${humanppi_out}"
+fi
 
 # Remap humanppi_dimer index keys (numeric IDs) to lookup names so DbReader can search by accession.
 # Keep backups of original numeric-key index files the first time.
@@ -142,6 +150,7 @@ remap_index_with_lookup() {
     mv -f -- "${idx_file}.tmp" "${idx_file}"
     echo "remapped + sorted ${idx_file}"
 }
-
+if false; then
 remap_index_with_lookup "${humanppi_idx}" "${humanppi_lookup}"
 remap_index_with_lookup "${humanppi_ca_idx}" "${humanppi_lookup}"
+fi
