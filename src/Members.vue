@@ -80,15 +80,10 @@
                                 </span>
                             </template>
                             <span>
-                                <img width="600" src="./assets/cluster_step.jpg"><br>
-                                <!-- TODO -->
-                                Member: TODO <br>
-                                Dimer Representative: TODO <br>
-                                Interface Representative: TODO <br>
-                                <!-- AFDB/Foldseek: Clustered with structural similarity<br> -->
-                                <!-- AFDB50/Mmseqs: Clustered at sequence identity 50%<br> -->
-                                <!-- Fragment: Removed fragments among AFDB50<br> -->
-                                <!-- Singleton: Removed singletons after fragment removal -->
+                                <img width="600" src="./assets/interface_cluster_workflow.png"><br>
+                                Member: Members from either dimer or interface clustering <br>
+                                Dimer Rep.: Clustered with dimer structural similarity <br>
+                                Interface Rep.: Clustered with interface structural similarity <br>
                             </span>
                         </v-tooltip>
                     </v-btn>

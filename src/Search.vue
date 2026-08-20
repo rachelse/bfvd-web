@@ -16,11 +16,11 @@
                             cols="12"
                         >
                             <h1 class="text-h3 font-weight-light mb-4">
-                                Interface Clusters
+                                PDB Interface Clusters
                             </h1>
-                            <!-- <h4 class="subheading"> # TODO
-                                Investigate the <a href="https://foldseek.com" target="_blank" rel="noopener">Foldseek</a> clustered <a href="https://alphafold.ebi.ac.uk" target="_blank" rel="noopener">AlphaFold database</a>
-                            </h4> -->
+                            <h4 class="text-h6 font-weight-light mb-4">
+                                Explore the clustered <a href="https://www.rcsb.org" target="_blank" rel="noopener">Protein Data Bank</a> using <a href="https://foldseek.com" target="_blank" rel="noopener">Foldseek-Interface</a>
+                            </h4>
                             
                             <br>
                              
@@ -209,16 +209,16 @@
                         
                         <p class="text-subtitle-1 mb-0" style="word-break: break-word;">
                             <!-- TODO -->
-                            <!-- Barrio-Hernandez&nbsp;I, Yeo&nbsp;J, Jänes&nbsp;J, Mirdita&nbsp;M, Gilchrist&nbsp;CLM, Wein&nbsp;T, Varadi&nbsp;M, Velankar&nbsp;S, Beltrao&nbsp;P, Steinegger&nbsp;M. 
-                            <a href="https://nature.com/articles/s41586-023-06510-w" target="_blank" rel="noopener">Clustering predicted structures at the scale of the known protein universe.</a>
-                            Nature,&nbsp;2023. -->
+                            Strom&nbsp;J.M, Cha&nbsp;S, Kim&nbsp;R.S, Sajal&nbsp;H, Steinegger&nbsp;M, Luck&nbsp;K. 
+                            <a href="TODO" target="_blank" rel="noopener">TODO</a>
+                            bioRxiv,&nbsp;2026.
                         </p>
                     </v-card-title>
                     </v-flex>
                 </v-card>
 
                 <p class="text-subtitle-1 mb-0 collab">
-                    AFDB Clusters is a collaboration between
+                    PDB Interface Clusters is a collaboration between
                     <a href="https://en.snu.ac.kr/">Seoul National University</a> and the
                     <a href="https://www.imb.de/">Institue of Molecular Biology Mainz</a>
                 </p>
@@ -263,16 +263,16 @@ export default {
             query: "172289393",
             queryAccessions: ["Q8GBB2"],
             selectedExample: 1,
-            accessionexamples: [ // TODO
+            accessionexamples: [
                 {id:'Q8GBB2', desc:'tRNA (adenine(58)-N(1))-methyltransferase TrmI'},
-                {id:'6LHT', desc:'TODO'},
-                {id: 'P69924', id2: 'P00452', desc: 'TODO'}
+                {id:'6LHT', desc:'Viral Protein'},
+                {id: 'P69924', id2: 'P00452', desc: 'nrdA / nrdB'},
             ],
-            intcluexamples: [ // TODO
+            intcluexamples: [
                 {id: '68503201', desc: 'VIRAL PROTEIN/IMMUNE SYSTEM'},
                 {id:'20404701', desc:'TRANSFERASE'},
             ],
-            queryGo: { text: "TODO", value: "TODO" },
+            queryGo: { text: "", value: "" },
             goSearchType: "lower",
             queryLCA: { text: "Homo sapiens", value: "9606", common_name: "human" },
             lcaSearchType: "lower",
@@ -476,13 +476,12 @@ code {
 
 .hero ::v-deep .v-parallax__image {
   width: 100% !important;
-  /* height: 100% !important; */
   object-fit: contain !important;
   object-position: right top;
 }
 
 .marv-bg-fg {
-    /* background: url('./assets/bg-fg-tmp1.png'); /* /* TODO */
+    /* background: url('./assets/bg-fg-tmp1.png'); */
     background-size: 98% 90%;
     background-repeat: no-repeat;
     background-attachment: scroll;

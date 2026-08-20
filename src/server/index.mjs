@@ -450,10 +450,7 @@ app.get('/api/search/foldseek{/:taxonomy}', async (req, res) => {
                         }
                         const [c1, c2] = m[2] <= m[3] ? [m[2], m[3]] : [m[3], m[2]];
                         const foldseek_key = `${m[1].toLowerCase()}_${c1}_${c2}`;
-                        // TODO: decide filtering criteria
-                        // if (result.alignments[0][j].prob < 0.95) {
-                        //     continue;
-                        // }
+
                         results.push({
                             foldseek_key,
                             eval: result.alignments[0][j].eval,

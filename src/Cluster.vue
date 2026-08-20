@@ -18,7 +18,7 @@
                             <template v-slot:activator="{ on }">
                                 <span v-on="on"><v-icon v-on="on">{{ $MDI.HelpCircleOutline }}</v-icon></span>
                             </template>
-                            <span>TODO</span>
+                            <span>Computed across all members of the interface cluster<br>i.e. after both dimer and interface clustering with Foldseek-Interfaces</span>
                         </v-tooltip>
                     </h3>
                     
