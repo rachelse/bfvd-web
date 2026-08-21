@@ -16,7 +16,7 @@
                             cols="12"
                         >
                             <h1 class="text-h3 font-weight-light mb-4">
-                                PDB Interface Clusters
+                                Protein Interface Clusters
                             </h1>
                             <h4 class="text-h6 font-weight-light mb-4">
                                 Explore the clustered <a href="https://www.rcsb.org" target="_blank" rel="noopener">Protein Data Bank</a> using <a href="https://foldseek.com" target="_blank" rel="noopener">Foldseek-Interface</a>
@@ -218,7 +218,7 @@
                 </v-card>
 
                 <p class="text-subtitle-1 mb-0 collab">
-                    PDB Interface Clusters is a collaboration between
+                    Protein Interface Clusters is a collaboration between
                     <a href="https://en.snu.ac.kr/">Seoul National University</a> and the
                     <a href="https://www.imb.de/">Institue of Molecular Biology Mainz</a>
                 </p>
@@ -260,17 +260,17 @@ export default {
     data() {
         return {
             tab: 0,
-            query: "172289393",
-            queryAccessions: ["Q8GBB2"],
+            query: "9101358",
+            queryAccessions: ["5B83"],
             selectedExample: 1,
             accessionexamples: [
-                {id:'Q8GBB2', desc:'tRNA (adenine(58)-N(1))-methyltransferase TrmI'},
-                {id:'6LHT', desc:'Viral Protein'},
+                {id:'5B83', desc:'Signaling protein'},
+                {id:'P63104', desc:'14-3-3 protein zeta/delta'},
                 {id: 'P69924', id2: 'P00452', desc: 'nrdA / nrdB'},
             ],
             intcluexamples: [
-                {id: '68503201', desc: 'VIRAL PROTEIN/IMMUNE SYSTEM'},
-                {id:'20404701', desc:'TRANSFERASE'},
+                {id:'43749830', desc:'14-3-3 zeta in complex with the human Son of sevenless homolog 1 (SOS1)'},
+                {id: '9101358', desc: 'Human Optineurin homodimer'},
             ],
             queryGo: { text: "", value: "" },
             goSearchType: "lower",
