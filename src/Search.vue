@@ -19,7 +19,7 @@
                                 Protein Interface Clusters
                             </h1>
                             <h4 class="text-h6 font-weight-light mb-4">
-                                Explore the clustered <a href="https://www.rcsb.org" target="_blank" rel="noopener">Protein Data Bank</a> using <a href="https://foldseek.com" target="_blank" rel="noopener">Foldseek-Interface</a>
+                                Explore clusters of protein interfaces from the <a href="https://www.rcsb.org" target="_blank" rel="noopener">Protein Data Bank</a> using <a href="https://foldseek.com" target="_blank" rel="noopener">Foldseek-Interface</a>
                             </h4>
                             
                             <br>
@@ -208,9 +208,9 @@
                     <v-card-title primary-title class="pt-0 mt-0">
                         
                         <p class="text-subtitle-1 mb-0" style="word-break: break-word;">
-                            <!-- TODO -->
-                            Strom&nbsp;J.M, Cha&nbsp;S, Kim&nbsp;R.S, Sajal&nbsp;H, Steinegger&nbsp;M, Luck&nbsp;K. 
-                            <a href="TODO" target="_blank" rel="noopener">TODO</a>
+                            <!-- TODO: add url <a href="" target="_blank" rel="noopener"> in front of the title -->
+                            Strom&nbsp;J.M, Cha&nbsp;S, Kim&nbsp;R.S, Sajal&nbsp;H, Gilchrist&nbsp;CLM, Steinegger&nbsp;M, Luck&nbsp;K. 
+                            Foldseek-Interface reveals a protein interface universe far from complete,&nbsp;
                             bioRxiv,&nbsp;2026.
                         </p>
                     </v-card-title>
