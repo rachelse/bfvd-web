@@ -1,19 +1,19 @@
 <template>
-    <v-container grid-list-md fluid px-0 py-0 id="search-container">
-        <v-layout wrap>
-            <v-flex xs12 pa-0 >
+    <v-container fluid class="px-0 py-0" id="search-container">
+        <v-row class="ma-0">
+            <v-col cols="12" class="pa-0">
                 <v-parallax
                     :height="windowHeight"
                     :src="require('./assets/BFVD-bg.png')"
-                    dark
                 >
+                    <v-theme-provider theme="dark" with-background style="background: transparent;">
                     <v-row
                         align="center"
                         justify="center"
                         class="marv-bg-fg"
                     >
                         <v-col
-                            class="text-center"
+                            class="text-center pt-8"
                             cols="12"
                         >
                             <h1 class="text-h4 font-weight-thin mb-4">
@@ -31,17 +31,16 @@
                                 v-model="tab"
                                 centered
                                 background-color="transparent"
-                                dark
                             >
                                 <v-tab>UniProt</v-tab>
                                 <!-- <v-tab>Gene Ontology</v-tab> -->
                                 <v-tab>Taxonomy</v-tab>
                                 <v-tab>Structure</v-tab>
                             </v-tabs>
-                            <v-tabs-items v-model="tab" style="padding: 1em;">
-                                <v-tab-item>
+                            <v-tabs-window v-model="tab" style="padding: 1em;">
+                                <v-tabs-window-item>
                                     <v-text-field
-                                        outlined
+                                        variant="outlined"
                                         label="UniProt accession"
                                         style="max-width: 400px; margin: 0 auto;"
                                         v-model="query"
@@ -53,29 +52,24 @@
                                         @keydown="error = null"
                                         :error="error != null"
                                         :error-messages="error ? error : []"
-                                        dark
                                         >
                                     </v-text-field>
                                     
-                                    <template>
-                                        <h2 class="text-h6 mb-2">
-                                            Examples
-                                        </h2>
-                                        <v-chip-group
-                                            column
-                                            dark
-                                            v-model="selectedExample"
-                                            style="max-width: 400px; margin: 0 auto; "
-                                        >
-
-                                            <v-chip v-for="item in examples" :key="item.id"
-                                                outlined v-on:click="query=item.id" >
-                                                <b>{{ item.id }}</b> &emsp; {{ item.desc }}
-                                            </v-chip>
-                                        </v-chip-group>
-                                    </template>
-                                </v-tab-item>
-                                <!-- <v-tab-item>
+                                    <h2 class="text-h6 mb-2">
+                                        Examples
+                                    </h2>
+                                    <v-chip-group
+                                        column
+                                        v-model="selectedExample"
+                                        style="max-width: 400px; margin: 0 auto; "
+                                    >
+                                        <v-chip v-for="(item, index) in examples" :key="item.id" :value="index"
+                                            variant="outlined" v-on:click="query=item.id" >
+                                            <b>{{ item.id }}</b> &emsp; {{ item.desc }}
+                                        </v-chip>
+                                    </v-chip-group>
+                                </v-tabs-window-item>
+                                <!-- <v-tabs-window-item>
                                     <GoAutocomplete
                                         :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
                                         v-model="queryGo"
@@ -95,18 +89,17 @@
                                             "
                                         v-model="goSearchType"
                                         inline>
-                                        <v-radio name="goSearchType" label="Include lower GO lineage" value="lower" dark></v-radio>
-                                        <v-radio name="goSearchType" label="Exact GO term" value="exact" dark ></v-radio>
+                                        <v-radio name="goSearchType" label="Include lower GO lineage" value="lower"></v-radio>
+                                        <v-radio name="goSearchType" label="Exact GO term" value="exact"></v-radio>
                                     </v-radio-group>
-                                </v-tab-item> -->
-                                <v-tab-item>
+                                </v-tabs-window-item> -->
+                                <v-tabs-window-item>
                                     <TaxonomyNcbiSearch
                                         :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
                                         @click:append="searchLCA"
-                                        @input="searchLCA"
+                                        @update:model-value="searchLCA"
                                         @keyup.enter="searchLCA"
                                         v-model="queryLCA"
-                                        :value="queryLCA ? queryLCA.text : ''"
                                     ></TaxonomyNcbiSearch>
                                     <v-radio-group 
                                         style="
@@ -115,26 +108,27 @@
                                             "
                                         v-model="lcaSearchType"
                                         inline>
-                                        <v-radio name="lcaSearchType" label="Include lower LCA lineage" value="lower" dark></v-radio>
-                                        <v-radio name="lcaSearchType" label="Exact LCA identifier" value="exact" dark ></v-radio>
+                                        <v-radio name="lcaSearchType" label="Include lower LCA lineage" value="lower"></v-radio>
+                                        <v-radio name="lcaSearchType" label="Exact LCA identifier" value="exact"></v-radio>
                                     </v-radio-group>
-                                </v-tab-item>
-                                <v-tab-item>
-                                    <FoldseekSearchButton @response="searchFoldseek($event)" dark></FoldseekSearchButton>
-                                </v-tab-item>
-                            </v-tabs-items>
+                                </v-tabs-window-item>
+                                <v-tabs-window-item>
+                                    <FoldseekSearchButton @response="searchFoldseek($event)"></FoldseekSearchButton>
+                                </v-tabs-window-item>
+                            </v-tabs-window>
                         </v-col>
                     </v-row>
+                    </v-theme-provider>
                 </v-parallax>
-            </v-flex>
+            </v-col>
             <!-- <GoSearchResult v-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult> -->
             <!-- <LCASearchResult v-else-if="tab == 2" @total="small = $event > 0; inSearch = false;"></LCASearchResult> -->
             <!-- <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult> -->
             <LCASearchResult v-if="tab == 1" @total="small = $event > 0; inSearch = false;"></LCASearchResult>
             <FoldseekSearchResult v-else-if="tab == 2" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult>
-            <v-flex>
+            <v-col>
                 <v-card rounded="0">
-                    <v-flex>
+                    <v-col>
                     <v-card-title primary-title class="pb-0 mb-0">
                         <div class="text-h5 mb-0">Reference</div>
                     </v-card-title>
@@ -146,7 +140,7 @@
                             Nucleic Acids Research,&nbsp;gkae1119,&nbsp;2024.
                         </p>
                     </v-card-title>
-                    </v-flex>
+                    </v-col>
                 </v-card>
 
                 <!-- <p class="text-subtitle-1 mb-0 collab">
@@ -166,8 +160,8 @@
                         <img class="logos" src="./assets/logo_sib.svg" height="64"/>
                     </a>
                 </div> -->
-            </v-flex>
-        </v-layout>
+            </v-col>
+        </v-row>
     </v-container>
 </template>
 
@@ -209,6 +203,7 @@ export default {
             response: null,
             small: false,
             error: null,
+            viewportHeight: window.innerHeight,
         };
     },
     computed: {
@@ -216,11 +211,16 @@ export default {
             if (this.small && !this.tab == 0) {
                 return 500;
             }
-            return Math.max(Math.min(860, (window.innerHeight - 48) * 0.8), 500);
+            return Math.max(Math.min(860, (this.viewportHeight - 48) * 0.8), 650);
         },
     },
     mounted() {
         this.setTab();
+        this.handleViewportResize = () => { this.viewportHeight = window.innerHeight; };
+        window.addEventListener('resize', this.handleViewportResize);
+    },
+    beforeUnmount() {
+        window.removeEventListener('resize', this.handleViewportResize);
     },
     watch : {
         '$route': function(to, from) {
@@ -339,11 +339,11 @@ code {
     font-size: 0.8em;
 }
 
-.theme--dark .v-input label {
+.v-theme--dark .v-input label {
     color: #FFFFFFB3;
 }
 
-.theme--light .v-input label {
+.v-theme--light .v-input label {
     color: #00000099;
 }
 
@@ -359,7 +359,7 @@ code {
     text-transform: none;
     padding: 0 24px
 }
-.v-tabs-items {
+.v-tabs-window {
     background-color: transparent !important;
 }
 

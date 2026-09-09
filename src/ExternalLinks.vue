@@ -1,9 +1,9 @@
 <template>
     <!-- <v-menu
         :close-on-content-click="false">
-        <template v-slot:activator="{ on }">
+        <template v-slot:activator="{ props }">
             <slot v-if="$slots['accession']" name="accession"></slot>
-            <template v-else>{{ accession }}</template>&nbsp;<v-btn v-on="on" plain text small icon>
+            <template v-else>{{ accession }}</template>&nbsp;<v-btn v-bind="props" plain text small icon>
                 <v-icon small>
                     {{ $MDI.OpenInNew }}
                 </v-icon>

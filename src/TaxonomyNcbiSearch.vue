@@ -1,26 +1,27 @@
 <template>
     <v-tooltip open-delay="300" top>
-        <template v-slot:activator="{ on }">
+        <template v-slot:activator="{ props }">
             <v-autocomplete
-                outlined
-                :value="value"
+                variant="outlined"
+                :model-value="modelValue"
+                item-title="text"
+                item-value="value"
                 label="Taxonomic name"
                 placeholder="Start typing scientific name to search"
                 hide-no-data
                 :items="items"
                 :loading="isLoading"
-                :search-input.sync="search"
+                v-model:search="search"
                 style="max-width: 400px; margin: 0 auto;"
-                @input="change"
+                @update:model-value="change"
                 return-object
                 auto-select-first
                 :allow-overflow="false"
-                dark
-                v-bind="$attrs"
-                v-on="$listeners"
+                theme="dark"
+                v-bind="{ ...$attrs, ...props }"
             >
                 <template v-slot:item="{ item }">
-                    {{ item.text }}<template v-if="item.common_name">&nbsp;({{ item.common_name }})</template>
+                    {{ item.raw.text }}<template v-if="item.raw.common_name">&nbsp;({{ item.raw.common_name }})</template>
                 </template>
             </v-autocomplete>
         </template>
@@ -33,7 +34,8 @@ import { create } from 'axios';
 import { debounce } from './lib/debounce';
 
 export default {
-  props: ['value'],
+  props: ['modelValue'],
+  emits: ['update:modelValue'],
   data() {
       return {
           items: [],
@@ -42,19 +44,19 @@ export default {
       }
   },
   mounted() {
-      this.items = [ this.value ];
+      this.items = [ this.modelValue ];
   },
   watch: {
-      value(val) {
-          this.items = [ this.value ];
+      modelValue(val) {
+          this.items = [ val ];
       },
       search (val) {
-          val && val.length > 2 && val !== this.value && this.querySelections(val)
+          val && val.length > 2 && val !== this.modelValue && this.querySelections(val)
       },
   },
   methods: {
       change(taxId) {
-        this.$emit('input', taxId);
+        this.$emit('update:modelValue', taxId);
       },
       querySelections: debounce(function (name) {
           this.loading = true;

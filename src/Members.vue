@@ -1,22 +1,20 @@
 <template>
 <Panel style="margin-top: 1em;" collapsible>
-    <template slot="header">
+    <template v-slot:header>
         UniRef members
     </template>
 
-    <template slot="toolbar-extra">
+    <template v-slot:toolbar-extra>
         <v-menu offset-y>
-            <template v-slot:activator="{ on }">
-                <v-btn plain v-on="on">
+            <template v-slot:activator="{ props }">
+                <v-btn variant="plain" v-bind="props">
                     <v-icon class="mr-1">{{ $MDI.Export }}</v-icon>
                     Export
                 </v-btn>
             </template>
             <v-list>
                 <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/members?format=accessions&${requestOptions.params.toString()}`" target="_blank">
-                    <v-list-item-content>
-                        <v-list-item-title>Accessions</v-list-item-title>
-                    </v-list-item-content>
+                    <v-list-item-title>Accessions</v-list-item-title>
                 </v-list-item>
                 <!-- <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/members?format=fasta&${requestOptions.params.toString()}`" target="_blank">
                     <v-list-item-content>
@@ -27,12 +25,14 @@
         </v-menu>
     </template>
         
-<template slot="content" v-if="$route.params.cluster">
+<template v-slot:content>
+    <template v-if="$route.params.cluster">
     <Sankey :cluster="cluster" type="members" @select="sankeySelect"></Sankey>
     <v-data-table
         :headers="headers"
         :items="members"
-        :options.sync="options"
+        v-model:page="options.page"
+        v-model:items-per-page="options.itemsPerPage"
         :server-items-length="totalMembers"
         :loading="loading"
         :footer-props="{
@@ -43,7 +43,7 @@
             <ExternalLinks :accession="prop.value"></ExternalLinks><br>
             {{ prop.item.description }}
         </template>
-        <!-- <template v-slot:header.structure="{ header }">
+        <!-- <template v-slot:header.structure="{ column }">
             {{ header.text }}
             <v-tooltip top>
                 <template v-slot:activator="{ on }">
@@ -64,7 +64,7 @@
         <!-- <template v-slot:item.flag="prop">
             <Fragment :flag="prop.value"></Fragment>
         </template> -->
-        <!-- <template v-slot:header.flag="{ header }">
+        <!-- <template v-slot:header.flag="{ column }">
             <v-menu
                 :close-on-content-click="false"
                 offset-y>
@@ -99,7 +99,7 @@
                 </v-card>
             </v-menu>
         </template> -->
-        <template v-slot:header.tax_id="{ header }">
+        <template v-slot:header.tax_id="{ column }">
                 <TaxonomyAutocomplete
                     :cluster="cluster"
                     v-model="options.tax_id"
@@ -118,6 +118,7 @@
             </v-chip>
         </template> -->
     </v-data-table>
+    </template>
 </template>
 </Panel>
 </template>
@@ -155,7 +156,7 @@ export default {
                 //     width: "10%",
                 // },
                 {
-                    text: "Accession",
+                    title: "Accession",
                     value: "accession",
                     sortable: false,
                     width: "35%",
@@ -172,7 +173,7 @@ export default {
                 //     width: "10%",
                 // },
                 {
-                    text: "Taxonomy",
+                    title: "Taxonomy",
                     value: "tax_id",
                     sortable: false,
                     width: "40%",
@@ -188,6 +189,8 @@ export default {
             totalMembers: 0,
             loading: false,
             options: {
+                page: 1,
+                itemsPerPage: 10,
                 tax_id: null,
             },
             taxAutocompleteDisabled: false,
@@ -203,6 +206,9 @@ export default {
         cluster() {
             this.fetchData();
         }
+    },
+    created() {
+        this.fetchData();
     },
     computed: {
         requestOptions() {

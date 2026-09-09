@@ -1,21 +1,21 @@
 <template>
-<v-app-bar app height="48px" fixed clipped-left :class="['ml-0', 'pl-3']">
+<v-app-bar height="48" :class="['ml-0', 'pl-3']">
     <!-- <v-app-bar-nav-icon :input-value="!mini ? 'activated' : undefined" @click.stop="toggleMini"></v-app-bar-nav-icon> -->
-    <v-app-bar-title><router-link to="/" style="color: inherit; text-decoration: none">BFVD</router-link></v-app-bar-title>
-    <img src="./assets/marv-foldseek-small.png" style="margin-left:8px; display: inline-block; width: 48px;height: 48px;vertical-align: middle" aria-hidden="true" />
+    <img src="./assets/marv-foldseek-small.png" style="display: inline-block; width: 48px;height: 48px;vertical-align: middle" aria-hidden="true" />
+    <v-app-bar-title style="flex: 0 0 auto; margin-inline-start: 8px;"><router-link to="/" style="color: inherit; text-decoration: none">BFVD</router-link></v-app-bar-title>
 
     <v-spacer></v-spacer>
     <v-toolbar-items class="hidden-sm-and-down">
-        <v-btn v-for="link in links" :key="link.title" text :href="link.href" rel="external noopener" target="_blank">{{ link.title }}</v-btn>
+        <v-btn v-for="link in links" :key="link.title" variant="text" :href="link.href" rel="external noopener" target="_blank">{{ link.title }}</v-btn>
         <!-- <v-btn icon rel="external noopener" target="_blank" href="https://github.com/steineggerlab/afdb-clusters-analysis">
             <v-icon>{{ $MDI.GitHub }}</v-icon>
         </v-btn> -->
     </v-toolbar-items>
     <v-menu class="hidden-md-and-up">
-        <template v-slot:activator="{ on }">
+        <template v-slot:activator="{ props }">
           <v-btn
             icon
-            v-on="on"
+            v-bind="props"
             class="hidden-md-and-up"
           >
             <v-icon>{{ $MDI.DotsVertical }}</v-icon>
@@ -23,14 +23,10 @@
         </template>
         <v-list>
           <v-list-item v-for="link in links" :key="link.title" rel="external noopener" target="_blank" :href="link.href">
-            <v-list-item-content>
-              <v-list-item-title>{{ link.title }}</v-list-item-title>
-             </v-list-item-content>
+            <v-list-item-title>{{ link.title }}</v-list-item-title>
           </v-list-item>
           <v-list-item rel="external noopener" target="_blank" href="https://github.com/steineggerlab/afdb-clusters-analysis">
-            <v-list-item-content>
-              <v-list-item-title>GitHub</v-list-item-title>
-            </v-list-item-content>
+            <v-list-item-title>GitHub</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
@@ -49,20 +45,7 @@ export default {
             { title: "Steinegger Lab", href: "https://steineggerlab.com/en/" },
         ]
     }),
-    created() {
-        this.$root.$on('multi', this.shouldExpand);
-    },
-    mounted() {
-        // defeat https://github.com/vuetifyjs/vuetify/pull/14523
-        // Object.defineProperty(this.$refs.drawer._data, 'isMouseover', { get: () => { false } })
-    },
-    beforeDestroy() {
-        this.$root.$off('multi', this.shouldExpand);
-    },
     methods: {
-        shouldExpand(expand) {
-            this.mini = !expand;
-        },
         toggleMini() {
             this.mini = !this.mini;
         },

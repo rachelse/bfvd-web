@@ -1,7 +1,7 @@
 <template>
     <div :class="['panel-root', elevation != null ? 'elevation-' + elevation : null ]">
-        <v-toolbar v-if="!!$slots['header'] || !!header" text dense dark>
-            <v-btn v-if="collapsible" style="margin-top:0;margin-left:-15px;" icon plain  @click="isCollapsed = !isCollapsed" :aria-expanded="isCollapsed ? 'false' : 'true'" :aria-controls="uuid">
+        <v-toolbar v-if="!!$slots['header'] || !!header" density="compact" theme="dark">
+            <v-btn v-if="collapsible" icon variant="plain"  @click="isCollapsed = !isCollapsed" :aria-expanded="isCollapsed ? 'false' : 'true'" :aria-controls="uuid">
                 <v-icon v-if="isCollapsed">
                     {{ $MDI.PlusBox }}
                 </v-icon>
@@ -9,10 +9,10 @@
                     {{ $MDI.MinusBox }}
                 </v-icon>
             </v-btn>
-            <span class="text-h6 align-end">
+            <v-toolbar-title class="text-h6 align-end">
                 <slot v-if="$slots['header']" name="header"></slot>
                 <template v-else>{{ header }}</template>
-            </span>
+            </v-toolbar-title>
             <v-spacer></v-spacer>
             <slot name="toolbar-extra"></slot>
         </v-toolbar>
@@ -52,8 +52,18 @@ export default {
 </script>
 
 <style scoped>
+.panel-root {
+    height: 100%;
+    display: flex;
+}
+
 .panel-root, .panel-content {
     flex-direction: column;
+}
+
+.panel-content {
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .panel-root header, .panel-content {
@@ -66,24 +76,43 @@ export default {
 
 .panel-root .force-fill-height {
     display: flex;
-    height: 100% !important;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .panel-root >>> .v-toolbar {
     background-repeat: repeat;
 }
 
-.theme--light .panel-root >>> .v-toolbar {
+.v-theme--light .panel-root >>> .v-toolbar {
     background: url('./assets/spiration-dark.png');
     
 }
 
-.theme--dark .panel-root >>> .v-toolbar {
+.v-theme--dark .panel-root >>> .v-toolbar {
     background: url('./assets/spiration-darker.png');
 }
 
 .panel-root >>> .text-h6 {
     margin-bottom: -5px;
+}
+
+.panel-root >>> .v-toolbar-title.text-h6 {
+    flex: 0 1 auto;
+}
+
+.panel-root >>> .v-toolbar-title.text-h6:first-child {
+    margin-inline-start: 20px;
+}
+
+.panel-root >>> .v-toolbar-title.text-h6:not(:first-child) {
+    margin-inline-start: 2px;
+}
+
+.panel-root >>> .v-toolbar-title.text-h6 .v-toolbar-title__placeholder {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: unset;
 }
 
 .panel-root >>> .text-h6 i.v-icon {

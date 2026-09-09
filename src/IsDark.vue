@@ -1,6 +1,6 @@
 <template>
     <!-- cluFlag 1: clustered in AFDB50, 2: clustered in AFDB clusters, 3: removed (fragments in Foldseek clusters), 4: removed (singletons in Foldseek clusters) -->
-    <v-chip :color="flagColor" outlined>
+    <v-chip :color="flagColor" variant="outlined">
         {{ flagText }}
     </v-chip>
 </template>
