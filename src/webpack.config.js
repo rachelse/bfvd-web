@@ -53,7 +53,7 @@ module.exports = (env, argv) => {
                     ]
                 },
                 {
-                    test: /\.(png|jpe?g|gif|svg|ttf|woff2?|eot|wasm)(\?.*)?$/,
+                    test: /\.(png|jpe?g|gif|svg|ttf|woff2?|eot|wasm|ico)(\?.*)?$/,
                     type: 'asset/resource'
                 },
                 {
@@ -68,10 +68,10 @@ module.exports = (env, argv) => {
                         {
                             loader: 'sass-loader',
                             options: {
+                                api: 'modern',
                                 sassOptions: {
-                                    includePaths: [path.resolve(__dirname, "assets")]
-                                },
-                                additionalData: `@import "_variables.scss"`
+                                    loadPaths: [path.resolve(__dirname, "assets"), path.resolve(__dirname, "../node_modules")]
+                                }
                             }
                         }
                     ]
@@ -84,10 +84,10 @@ module.exports = (env, argv) => {
                         {
                             loader: 'sass-loader',
                             options: {
+                                api: 'modern',
                                 sassOptions: {
-                                    includePaths: [path.resolve(__dirname, "assets")]
-                                },
-                                additionalData: `@import "_variables.scss";`
+                                    loadPaths: [path.resolve(__dirname, "assets"), path.resolve(__dirname, "../node_modules")]
+                                }
                             }
                         }
                     ]
@@ -136,7 +136,7 @@ module.exports = (env, argv) => {
                 },
             }) : new NullPlugin(),
         ],
-        devtool: isProduction ? 'source-map' : 'eval-source-map'
+        devtool: isProduction ? 'source-map' : 'cheap-module-source-map'
     }
 
     if (!isProduction) {
