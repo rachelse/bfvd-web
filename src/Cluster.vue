@@ -10,7 +10,11 @@
         <template v-slot:toolbar-extra>
             <v-chip v-if="response && response.warning == true" color="error">Warning</v-chip>
 
-            <v-menu v-if="response" offset-y left>
+            <!--
+                MSA/PAE download and MSA conservation are disabled for the
+                time being: none of them are provided yet.
+            -->
+            <v-menu v-if="false" offset-y left>
                 <template v-slot:activator="{ props }">
                     <v-btn variant="plain" v-bind="props">
                         <v-icon>{{ $MDI.NotificationClearAll }}</v-icon>
@@ -18,7 +22,7 @@
                     </v-btn>
                 </template>
                 <v-list>
-                    <v-list-item :href="'https://bfvd.steineggerlab.workers.dev/a3m/' + response.rep_accession + '.a3m'">
+                    <v-list-item>
                         <template v-slot:prepend>
                             <v-icon>{{ $MDI.FileDownloadOutline }}</v-icon>
                         </template>
