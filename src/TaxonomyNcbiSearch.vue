@@ -20,8 +20,8 @@
                 theme="dark"
                 v-bind="{ ...$attrs, ...props }"
             >
-                <template v-slot:item="{ item }">
-                    {{ item.raw.text }}<template v-if="item.raw.common_name">&nbsp;({{ item.raw.common_name }})</template>
+                <template v-slot:item="{ item, props }">
+                    <v-list-item v-bind="props" :title="item.raw?.text" :subtitle="item.raw?.common_name"></v-list-item>
                 </template>
             </v-autocomplete>
         </template>
@@ -44,11 +44,11 @@ export default {
       }
   },
   mounted() {
-      this.items = [ this.modelValue ];
+      this.items = this.modelValue ? [ this.modelValue ] : [];
   },
   watch: {
       modelValue(val) {
-          this.items = [ val ];
+          this.items = val ? [ val ] : [];
       },
       search (val) {
           val && val.length > 2 && val !== this.modelValue && this.querySelections(val)

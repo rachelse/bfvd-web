@@ -15,8 +15,8 @@
         auto-select-first
         clearable
     >
-        <template v-slot:item="{ item }">
-                {{ item.raw?.text }} ({{ item.raw?.rank }})
+        <template v-slot:item="{ item, props }">
+            <v-list-item v-bind="props" :title="item.raw?.text" :subtitle="item.raw?.rank"></v-list-item>
         </template>
     </v-autocomplete>
 </template>
