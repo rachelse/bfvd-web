@@ -143,5 +143,8 @@ app.use(vuetify);
 
 // make sure our CSS is load last
 import './assets/style.css';
+// Tailwind utilities load after everything else so they can win ties
+// against Vuetify's own classes of equal specificity.
+import './assets/tailwind.css';
 
 app.mount('#app');

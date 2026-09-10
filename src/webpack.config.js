@@ -58,7 +58,19 @@ module.exports = (env, argv) => {
                 },
                 {
                     test: /\.css$/,
+                    exclude: /tailwind\.css$/,
                     use: [isProduction ? MiniCssExtractPlugin.loader : 'vue-style-loader', 'css-loader']
+                },
+                {
+                    // Kept separate from the generic .css rule above so
+                    // postcss/Tailwind processing never touches Vuetify's
+                    // shipped CSS or style.css - only this one entry point.
+                    test: /tailwind\.css$/,
+                    use: [
+                        isProduction ? MiniCssExtractPlugin.loader : 'vue-style-loader',
+                        'css-loader',
+                        'postcss-loader',
+                    ]
                 },
                 {
                     test: /\.sass$/i,
