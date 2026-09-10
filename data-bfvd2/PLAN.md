@@ -31,7 +31,7 @@ From `$DATA_PATH` at boot (`src/server/index.mjs:17-62`):
 | `afdb_ca` + `.index` (+`.dbtype`) | 351,242 | 5,776,417 |
 | `afdb_plddt` + `.index` | 351,241 | 5,776,417 |
 | `afdb_desc` + `.index` | 3,248,874 | 5,776,417 |
-| `ava_db` + `.index` | 345,393 | deferred (§8) |
+| `ava_db` + `.index` | 345,393 | deferred (§8) — now **optional**, server runs without it |
 | `warning_db` | absent | skipped (server treats as optional) |
 
 Built size **14 GB**, plus ~80 GB once `ava_db` lands (v1: 1.7 GB total).
@@ -268,7 +268,7 @@ script: it cannot run until the entry-centric server changes land. See §7.
 | 10. `ava_db` | — | blocked: file still copying (§8) |
 | 11a. Code: `is_singleton` rename + `flag` (§5.1) | — | **done** — frontend builds clean, no `is_dark` left in `src/` |
 | 11b. Code: remove GO (§5.2) | — | **done** — endpoints, components, route and dead helper all gone |
-| 12a. Code: entry-centric server (§5.3) | — | **done** — no v1 table references remain |
+| 12a. Code: entry-centric server (§5.3) | — | **done** — smoke-tested against `out/`, see below |
 | 12b. Code: entry page UI (§5.4) | — | server now returns `species`, `ictv` and `host_source`; the Vue side is not wired up yet |
 | 13. Swap `out/` → `data/` | — | **yours** (§3.16) |
 
@@ -289,9 +289,29 @@ Two cross-checks worth recording, because each caught something a count alone wo
 withdrawn). The server already guards this with `tree.nodeExists()`, so they render as
 unknown rather than erroring.
 
-**No smoke test yet, deliberately.** The staged DB uses the entry-centric schema, which
-the current server cannot read — booting it would fail on `rep_accession` regardless of
-data quality. The smoke test belongs after step 12.
+**Smoke test: passed.** Booted against `data-bfvd2/out/` in **2.1 s** and exercised the
+endpoints across a ColabFold entry, a ProteinTTT entry and a singleton:
+
+| Endpoint | Result |
+|---|---|
+| `/api/<acc>` | entry + its cluster's aggregates |
+| `/api/cluster/<acc>` | full record incl. `species`, `ictv`, `host_source` |
+| `…/members` | 520 co-members for `A0A023IZF3`, paged, with descriptions |
+| `…/sankey-members` | taxonomy tree over the cluster |
+| `…/similars` | `[]` — no `ava_db` yet, handled rather than crashing |
+| `/api/structure/<acc>` | sequence + coordinates |
+| `…/members?format=fasta` \| `accessions` | both stream correctly |
+| `/api/search/lca` | 1,210,055 hits for *Lentivirus* |
+
+Two things this confirmed beyond the schema working:
+
+- `species` for `A0A023IZF3` resolves off the NCBI tree to *Lentivirus humimdef1* —
+  exactly the ICTV binomial, so §3.8's decision to drop `ictv_species` holds in practice.
+- The members FASTA export works. It was **broken in v1**, where `afdb` held only the
+  351,242 representatives while the export asked for member accessions.
+
+`ava_db` had to become optional to get here (it is loaded unconditionally in v1); the
+server now logs that "Similar entries" will be empty and carries on.
 
 Diffing the shell rewrite against the Python prototype it replaced (§3.14) caught
 three bugs that would otherwise have shipped silently:

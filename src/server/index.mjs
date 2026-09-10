@@ -49,8 +49,15 @@ checkpoints.push(plddtDB.make(dataPath + '/afdb_plddt', dataPath + '/afdb_plddt.
 const descDB = new DbReader();
 checkpoints.push(descDB.make(dataPath + '/afdb_desc', dataPath + '/afdb_desc.index'));
 
-const avaDb = new DbReader();
-checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
+// Optional, like warning_db below: the v2 all-vs-all is not built yet, and the server
+// is useful without it -- "Similar entries" simply comes back empty.
+let avaDb = null;
+if (existsSync(dataPath + '/ava_db')) {
+    avaDb = new DbReader();
+    checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
+} else {
+    console.log('No ava_db found; "Similar entries" will be empty.');
+}
 
 let warnDB = null;
 if (existsSync(dataPath + '/warning_db')) {
@@ -432,6 +439,10 @@ app.get('/api/cluster/:cluster/sankey-members', async (req, res) => {
 
 app.get('/api/cluster/:cluster/sankey-similars', async (req, res) => {
     const cluster = req.params.cluster;
+    if (avaDb == null) {
+        res.send([]);
+        return;
+    }
     const avaKey = avaDb.id(cluster);
     if (avaKey.found == false) {
         res.send([]);
@@ -655,6 +666,10 @@ app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
 
 app.get('/api/cluster/:cluster/similars', async (req, res) => {
     const cluster = req.params.cluster;
+    if (avaDb == null) {
+        res.send([]);
+        return;
+    }
     const avaKey = avaDb.id(cluster);
     if (avaKey.found == false) {
         res.send([]);
@@ -760,6 +775,10 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
 
 app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => {
     const cluster = req.params.cluster;
+    if (avaDb == null) {
+        res.send([]);
+        return;
+    }
     const avaKey = avaDb.id(cluster);
     if (avaKey.found == false) {
         res.send([]);
