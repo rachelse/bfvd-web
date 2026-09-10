@@ -60,14 +60,6 @@ export default {
 .panel-root {
     height: 100%;
     display: flex;
-    /* A colorful strip sized to just the header's height, sitting behind
-       the translucent toolbar - backdrop-filter has nothing to blur
-       without something visually rich behind it, and a flat page/card
-       background blurs into itself, i.e. no visible effect at all. */
-    background: linear-gradient(120deg, #30e940 0%, #1e88e5 55%, #ffc107 100%);
-    background-size: 100% 64px;
-    background-repeat: no-repeat;
-    background-position: top left;
 }
 
 .panel-root, .panel-content {
@@ -93,22 +85,9 @@ export default {
     min-height: 0;
 }
 
-/* Blur/saturate/border/shadow for the glass toolbar are Tailwind utility
-   classes on the element itself (see Panel's template) - only the
-   theme-dependent gradient tint stays here, since it needs to key off
-   Vuetify's .v-theme--light/.v-theme--dark ancestor class, which Tailwind
-   has no built-in variant for. */
-.v-theme--light .panel-root >>> .v-toolbar {
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 60%),
-        rgba(30, 41, 59, 0.4);
-}
-
-.v-theme--dark .panel-root >>> .v-toolbar {
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.02) 60%),
-        rgba(15, 23, 42, 0.25);
-}
+/* No custom background here - the toolbar's fill is entirely the
+   tailwind-glassmorphism plugin's own .glassmorphism-50 utility
+   (flat translucent white + blur), used as-is. */
 
 .panel-root >>> .text-h6 {
     margin-bottom: -5px;
