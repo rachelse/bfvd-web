@@ -69,30 +69,6 @@
                                         </v-chip>
                                     </v-chip-group>
                                 </v-tabs-window-item>
-                                <!-- <v-tabs-window-item>
-                                    <GoAutocomplete
-                                        :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
-                                        v-model="queryGo"
-                                        :disabled="inSearch"
-                                        @click:append="searchGo"
-                                        @keyup.enter="searchGo"
-                                        @change="selectedExample = null"
-                                        @keydown="error = null"
-                                        :error="error != null"
-                                        :error-messages="error ? error : []"
-                                        ></GoAutocomplete>
-
-                                    <v-radio-group 
-                                        style="
-                                            max-width: 400px;
-                                            margin: 0 auto;
-                                            "
-                                        v-model="goSearchType"
-                                        inline>
-                                        <v-radio name="goSearchType" label="Include lower GO lineage" value="lower"></v-radio>
-                                        <v-radio name="goSearchType" label="Exact GO term" value="exact"></v-radio>
-                                    </v-radio-group>
-                                </v-tabs-window-item> -->
                                 <v-tabs-window-item>
                                     <TaxonomyNcbiSearch
                                         :append-icon="inSearch ? $MDI.ProgressWrench : $MDI.Magnify"
@@ -121,7 +97,6 @@
                     </v-theme-provider>
                 </v-parallax>
             </v-col>
-            <!-- <GoSearchResult v-if="tab == 1" @total="small = $event > 0; inSearch = false;"></GoSearchResult> -->
             <!-- <LCASearchResult v-else-if="tab == 2" @total="small = $event > 0; inSearch = false;"></LCASearchResult> -->
             <!-- <FoldseekSearchResult v-else-if="tab == 3" @total="small = $event > 0; inSearch = false;"></FoldseekSearchResult> -->
             <LCASearchResult v-if="tab == 1" @total="small = $event > 0; inSearch = false;"></LCASearchResult>
@@ -167,8 +142,6 @@
 
 <script>
 import Panel from "./Panel.vue";
-import GoAutocomplete from "./GoAutocomplete.vue";
-import GoSearchResult from "./GoSearchResult.vue";
 import FoldseekSearchButton from "./FoldseekSearchButton.vue";
 import TaxonomyNcbiSearch from "./TaxonomyNcbiSearch.vue";
 import LCASearchResult from "./LCASearchResult.vue";
@@ -178,8 +151,6 @@ export default {
     name: "search",
     components: { 
         Panel,
-        GoAutocomplete,
-        GoSearchResult,
         TaxonomyNcbiSearch,
         LCASearchResult,
         FoldseekSearchButton,
@@ -195,8 +166,6 @@ export default {
                 {id:'P21405', desc:'Replicase polyprotein P2AB'},
                 {id:'A0A0R5U5Y9', desc:'Hemagglutinin'},
             ],
-            queryGo: { text: "immune response", value: "GO:0006955" },
-            goSearchType: "lower",
             queryLCA: { text: "Tobacco mosaic virus", value: "12242", common_name: "Tobacco mosaic virus" },
             lcaSearchType: "lower",
             inSearch: false,
@@ -234,11 +203,7 @@ export default {
             console.log(value);
         },
         setTab() {
-            if (this.$route.params.go) {
-                this.tab = 1;
-                this.queryGo = { text: "" + this.$route.params.go, value: this.$route.params.go};
-                this.goSearchType = this.$route.params.type;
-            } else if (this.$route.params.taxid) {
+            if (this.$route.params.taxid) {
                 // this.tab = 2;
                 this.tab = 1;
                 this.queryLCA = {text: "" + this.$route.params.taxid, value: this.$route.params.taxid};
@@ -267,22 +232,6 @@ export default {
                 .finally(() => {
                     this.inSearch = false;
                 });
-        },
-        searchGo() {
-            if (!this.queryGo) {
-                return;
-            }
-            this.inSearch = true;
-            this.error = null;
-            this.$router.push({
-                name: "go",
-                params: { go: this.queryGo.value, type: this.goSearchType }
-            })
-            .catch((error) => {
-                if (error && error.name == "NavigationDuplicated") {
-                    this.inSearch = false;
-                }
-            });
         },
         searchLCA() {
             if (!this.queryLCA) {

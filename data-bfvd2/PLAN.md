@@ -215,7 +215,7 @@ scratch. `mkdb.awk` needs a "grouped but unsorted" mode for it.
 `Fragment.vue` gets rewritten in the same pass for the new `flag` values, which also
 lets `Members.vue`'s commented-out flag filter be re-enabled.
 
-**5.2 Remove GO** — delete `GoAutocomplete.vue`, `GoSearchResult.vue`; drop imports and
+**5.2 Remove GO — done.** Deleted `GoAutocomplete.vue`, `GoSearchResult.vue`; drop imports and
 the already-commented tab from `Search.vue`; delete two endpoints from `index.mjs`.
 
 **5.3 Entry-centric server** — 10 query sites in `index.mjs`. Pattern: `cluster` becomes
@@ -265,7 +265,7 @@ script: it cannot run until the entry-centric server changes land. See §7.
 | 9. `validate.sh` | 3 min | **done** — **ALL CHECKS PASSED** (§6) |
 | 10. `ava_db` | — | blocked: file still copying (§8) |
 | 11a. Code: `is_singleton` rename + `flag` (§5.1) | — | **done** — frontend builds clean, no `is_dark` left in `src/` |
-| 11b. Code: remove GO (§5.2) | — | not started |
+| 11b. Code: remove GO (§5.2) | — | **done** — endpoints, components, route and dead helper all gone |
 | 12. Code: entry-centric server + entry page (§5.3–5.4) | — | not started; **the server cannot read this DB until it lands** |
 | 13. Swap `out/` → `data/` | — | **yours** (§3.16) |
 
