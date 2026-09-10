@@ -89,6 +89,10 @@ function unserializeTree(jsonIn) {
 function openFolderSources(pathDir) {
     return new Promise((resolve, reject) => {
         readdir(pathDir, (err, files) => {
+            if (err) {
+                reject(new Error(`Cannot read DATA_PATH directory ${pathDir}: ${err.message}`));
+                return;
+            }
             let data = {};
             files.forEach(file => {
                 if (file === 'names.dmp')
@@ -98,8 +102,17 @@ function openFolderSources(pathDir) {
                 if (file === 'merged.dmp')
                     data['mergedNodes'] = createReadStream(`${pathDir}/${file}`);
             });
-            if (!("nodeNames" in data) || !("topology" in data))
-                reject('Mssing');
+            if (!("nodeNames" in data) || !("topology" in data)) {
+                const missing = [
+                    !("nodeNames" in data) ? 'names.dmp' : null,
+                    !("topology" in data) ? 'nodes.dmp' : null,
+                ].filter(Boolean).join(', ');
+                reject(new Error(
+                    `Cannot build the taxonomy: ${pathDir} has no ncbitaxonomy.json and is `
+                    + `missing ${missing}. Point DATA_PATH at the directory holding the `
+                    + `dataset, or put the NCBI taxdump files there so it can be built.`));
+                return;
+            }
             resolve(data);
         });
     });
