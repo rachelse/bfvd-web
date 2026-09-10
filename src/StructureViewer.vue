@@ -88,7 +88,7 @@
         <template v-if="second">
             <span v-if="secondComponent == null">Superposition loading</span>
             <template v-else>
-                <span style="color:#FFC107">{{ second }}</span> superposed on representative <span style="color:#1E88E5">{{ cluster }}</span>
+                <span style="color:#FFC107">{{ second }}</span> superposed on <span style="color:#1E88E5">{{ cluster }}</span>
                 <template v-if="tmOutput">
                     <br>
                     <span><strong>TM-score:</strong>&nbsp; {{ tmOutput.tmScore.toFixed(2) }}</span>&nbsp;

@@ -220,7 +220,7 @@ export default {
             this.error = null;
             this.$axios.get("/" + this.query)
                 .then(response => {
-                    this.$router.push({ name: 'cluster', params: { cluster: response.data[0].rep_accession } })
+                    this.$router.push({ name: 'cluster', params: { cluster: response.data[0].accession } })
                 })
                 .catch((err) => {
                     if (err.response && err.response.data && err.response.data.error) {

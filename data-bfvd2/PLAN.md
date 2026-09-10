@@ -106,8 +106,11 @@ entry page reads species off the NCBI tree.
 call — drop later if unused). **`ictv_host` is kept because it is not derivable from
 NCBI** and is what lifts host coverage from 29.2% to 75.4%.
 
-**3.9 Schema names:** `accession` / `len`, not `rep_accession` / `rep_len` — there is no
-representative concept any more.
+**3.9 No `rep_` anywhere:** `accession` / `len` / `plddt` in the schema, the API *and*
+the frontend. I first kept the API aliased to the v1 names to avoid touching 45
+frontend references; that left the decision half-applied, so the rename now goes all
+the way through, including the `rep_length_range` / `rep_plddt_range` query params and
+the "Rep. length" / "Rep. pLDDT" column headings.
 
 **3.10 Routes stay `/api/cluster/<acc>`** for now.
 
@@ -269,7 +272,7 @@ script: it cannot run until the entry-centric server changes land. See §7.
 | 11a. Code: `is_singleton` rename + `flag` (§5.1) | — | **done** — frontend builds clean, no `is_dark` left in `src/` |
 | 11b. Code: remove GO (§5.2) | — | **done** — endpoints, components, route and dead helper all gone |
 | 12a. Code: entry-centric server (§5.3) | — | **done** — smoke-tested against `out/`, see below |
-| 12b. Code: entry page UI (§5.4) | — | server now returns `species`, `ictv` and `host_source`; the Vue side is not wired up yet |
+| 12b. Code: entry page UI (§5.4) | — | partly done: members now show structure images, naming and link colours fixed; `species`/`ictv`/`host_source` still not rendered |
 | 13. Swap `out/` → `data/` | — | **yours** (§3.16) |
 
 **Staged dataset: `/home/user2/bfvd-web/data-bfvd2/out/`, 14 GB.** `afdb`, `afdb_ca`, `afdb_plddt`,

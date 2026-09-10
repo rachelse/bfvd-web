@@ -4,7 +4,7 @@
     <v-col cols="12" md="7" lg="8">
     <panel fill-height>
         <template v-slot:header>
-            Entry: {{ response ? response.rep_accession : "Loading..." }}
+            Entry: {{ response ? response.accession : "Loading..." }}
         </template>
 
         <template v-slot:toolbar-extra>
@@ -30,7 +30,7 @@
                             MSA (.a3m)
                         </v-list-item-title>
                     </v-list-item>
-                    <v-list-item :href="'https://bfvd.steineggerlab.workers.dev/pae/' + response.rep_accession + '.json'">
+                    <v-list-item :href="'https://bfvd.steineggerlab.workers.dev/pae/' + response.accession + '.json'">
                         <template v-slot:prepend>
                             <v-icon>{{ $MDI.FileDownloadOutline }}</v-icon>
                         </template>
@@ -72,14 +72,14 @@
 
         <template v-slot:content>
             <template v-if="response">
-            <h3>Representative summary</h3>
+            <h3>Entry summary</h3>
             <dl class="dl-4">
                 <div>
                 <dt>
                     Accession
                 </dt>
                 <dd>
-                    <ExternalLinks :accession="response.rep_accession"></ExternalLinks><br>
+                    <ExternalLinks :accession="response.accession"></ExternalLinks><br>
                     {{ response.description }}
                 </dd>
                 </div>
@@ -88,7 +88,7 @@
                     Length
                 </dt>
                 <dd>
-                    {{ response.rep_len }} aa
+                    {{ response.len }} aa
                 </dd>
                 </div>
                 <div>
@@ -96,7 +96,7 @@
                     pLDDT
                 </dt>
                 <dd>
-                    {{ response.rep_plddt.toFixed(2) }}
+                    {{ response.plddt.toFixed(2) }}
                 </dd>
                 </div>
                 <div>
@@ -112,7 +112,7 @@
                     Taxonomy
                 </dt>
                 <dd>
-                    <template v-for="(taxonomy, index) in response.rep_lineage" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage.length -1)"> &#187;&nbsp;</template></template>
+                    <template v-for="(taxonomy, index) in response.lineage_entry" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.lineage_entry.length -1)"> &#187;&nbsp;</template></template>
                 </dd>
                 <dt v-if="response.hosts.length > 0">
                     Host
@@ -124,7 +124,7 @@
                 </dl>
                 <v-divider  style="margin-top:0.5em"></v-divider>
                 <h3 style="margin-top:1em">
-                    UniRef cluster summary
+                    Sequence cluster summary
                     <!--<v-tooltip top>
                         <template v-slot:activator="{ on }">
                             <span v-on="on">
@@ -192,11 +192,11 @@
     <v-col cols="12" md="5" lg="4">
     <Panel class="repr-structure" fill-height>
         <template v-slot:header>
-            Representative structure
+            Structure
         </template>
         
         <template v-slot:toolbar-extra>
-            <v-btn v-if="response" variant="plain" :href="'https://bfvd.steineggerlab.workers.dev/pdb/' + response.rep_accession + '.pdb'">
+            <v-btn v-if="response" variant="plain" :href="'https://bfvd.steineggerlab.workers.dev/pdb/' + response.accession + '.pdb'">
                 <v-icon class="mr-1">{{ $MDI.FileDownloadOutline }}</v-icon>
                 PDB
             </v-btn>
@@ -299,7 +299,7 @@ export default {
                     }
                     this.$axios.get("/" + this.$route.params.cluster)
                         .then(response => {
-                            this.$router.replace({ name: "cluster", params: { cluster: response.data[0].rep_accession } });
+                            this.$router.replace({ name: "cluster", params: { cluster: response.data[0].accession } });
                         })
                         .catch(() => {});
                 })

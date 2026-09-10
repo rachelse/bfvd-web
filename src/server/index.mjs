@@ -79,16 +79,10 @@ function getDescription(accession) {
 
 // BFVD v2 is entry-centric: every entry has its own structure and its own page, and
 // `cluster` only groups entries by sequence clustering (30% id / 90% cov) to drive the
-// members panel. The API keeps v1's rep_* field names so the frontend is unchanged --
-// same reasoning as keeping the /api/cluster/ routes -- so the entry's own columns are
-// aliased here rather than renamed everywhere.
+// members panel. Nothing is a "representative" any more, so the rep_* names are gone
+// from the API as well as the schema.
 const ENTRY_COLS = `
-    e.accession  AS rep_accession,
-    e.len        AS rep_len,
-    e.plddt      AS rep_plddt,
-    e.tax_id     AS tax_id,
-    e.flag       AS flag,
-    e.cluster_id AS cluster_id,
+    e.accession, e.len, e.plddt, e.tax_id, e.flag, e.cluster_id,
     c.n_mem, c.avg_len, c.avg_plddt, c.is_singleton, c.lca_tax_id`;
 
 const ENTRY_FROM = `FROM entry AS e JOIN cluster AS c ON e.cluster_id = c.cluster_id`;
@@ -168,7 +162,7 @@ function finalizeResult(result, req, res) {
         result = result.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
     }
     result.forEach((x) => {
-        x.description = getDescription(x.rep_accession);
+        x.description = getDescription(x.accession);
         if (!is_tax_filter) {
             if (x.lca_tax_id) {
                 x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
@@ -187,7 +181,7 @@ app.get('/api/search/lca/:taxonomy?', async (req, res) => {
 
     const is_singleton = req.query.is_singleton;
     let filter_params = [];
-    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
+    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'length_range', 'plddt_range']) {
         if (typeof(req.query[i]) == "undefined") {
             filter_params.push('0');
             filter_params.push('INF');
@@ -272,7 +266,7 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
 
     const is_singleton = req.query.is_singleton;
     let filter_params = [];
-    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
+    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'length_range', 'plddt_range']) {
         if (typeof(req.query[i]) == "undefined") {
             filter_params.push('0');
             filter_params.push('INF');
@@ -474,13 +468,13 @@ app.get('/api/cluster/:cluster', async (req, res) => {
     }
     result.tax_id = tree.nodeExists(result.tax_id) ? tree.getNode(result.tax_id) : null;
     if (result.tax_id != null) {
-        result.rep_lineage = tree.nodeExists(result.tax_id.id) ? tree.lineage(result.tax_id) : null;
+        result.lineage_entry = tree.nodeExists(result.tax_id.id) ? tree.lineage(result.tax_id) : null;
     } else {
-        result.rep_lineage = [{ id: 0, rank: "unknown", name: "unknown" }];
+        result.lineage_entry = [{ id: 0, rank: "unknown", name: "unknown" }];
     }
-    result.description = getDescription(result.rep_accession);
+    result.description = getDescription(result.accession);
     if (warnDB) {
-        const warnKey = warnDB.id(result.rep_accession);
+        const warnKey = warnDB.id(result.accession);
         result.warning = warnKey.found;
     } else {
         result.warning = false;
@@ -489,8 +483,8 @@ app.get('/api/cluster/:cluster', async (req, res) => {
     // species-rank ancestor, the NCBI scientific name equals the ICTV species for
     // 176,302 of 176,330 mapped taxids, so storing both would only add a way to disagree.
     result.species = null;
-    if (result.rep_lineage) {
-        const species = result.rep_lineage.find((x) => x.rank === "species");
+    if (result.lineage_entry) {
+        const species = result.lineage_entry.find((x) => x.rank === "species");
         if (species) {
             result.species = species;
         }
@@ -686,7 +680,7 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
         WHERE e.accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     result.forEach((x) => {
-        x.evalue = map.get(x.rep_accession);
+        x.evalue = map.get(x.accession);
         x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
     });
     // console.log(result)
@@ -733,14 +727,14 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
                 return 0;
             }
         })
-        sorted = sorted.filter((x) => x.rep_accession != cluster);
+        sorted = sorted.filter((x) => x.accession != cluster);
         const total = sorted.length;
         sorted = sorted.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
-        sorted.forEach((x) => { x.description = getDescription(x.rep_accession) });
+        sorted.forEach((x) => { x.description = getDescription(x.accession) });
         res.send({ total: total, similars: sorted });
         return;
     } else {
-        result.forEach((x) => { x.description = getDescription(x.rep_accession) });
+        result.forEach((x) => { x.description = getDescription(x.accession) });
     }
 
     const safeCluster = req.params.cluster.replace(/[^a-zA-Z0-9]/g, '');
@@ -750,7 +744,7 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
             res.setHeader('Content-Type', 'text/plain');
             res.charset = 'UTF-8';
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => similar.rep_accession).join('\n'),
+                chunk => chunk.map(similar => similar.accession).join('\n'),
                 chunk => res.write(chunk));
             res.end();
             break;
@@ -761,7 +755,7 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
             res.charset = 'UTF-8';
 
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => `>${similar.rep_accession} ${similar.description.trimEnd()} OX=${similar.lca_tax_id ? similar.lca_tax_id.id : '0'} OS=${similar.lca_tax_id ? similar.lca_tax_id.name : 'unknown'} Eval=${similar.evalue}\n${aaDb.data(aaDb.id(similar.rep_accession).value).toString('ascii')}`).join(''),
+                chunk => chunk.map(similar => `>${similar.accession} ${similar.description.trimEnd()} OX=${similar.lca_tax_id ? similar.lca_tax_id.id : '0'} OS=${similar.lca_tax_id ? similar.lca_tax_id.name : 'unknown'} Eval=${similar.evalue}\n${aaDb.data(aaDb.id(similar.accession).value).toString('ascii')}`).join(''),
                 chunk => res.write(chunk));
 
             res.end();

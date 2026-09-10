@@ -1,7 +1,18 @@
 <template>
 <Panel style="margin-top: 1em;" collapsible>
     <template v-slot:header>
-        UniRef members
+        Cluster members
+        <v-tooltip top>
+            <template v-slot:activator="{ props }">
+                <span v-bind="props">
+                    <v-icon size="small" v-bind="props">{{ $MDI.HelpCircleOutline }}</v-icon>
+                </span>
+            </template>
+            <span>
+                Other BFVD entries in the same sequence cluster
+                (MMseqs2, 30% identity, 90% coverage)
+            </span>
+        </v-tooltip>
     </template>
 
     <template v-slot:toolbar-extra>
@@ -43,16 +54,16 @@
             <ExternalLinks :accession="prop.value"></ExternalLinks><br>
             {{ prop.item.description }}
         </template>
-        <!-- <template v-slot:header.structure="{ column }">
-            {{ header.text }}
+        <template v-slot:header.structure="{ column }">
+            {{ column.title }}
             <v-tooltip top>
-                <template v-slot:activator="{ on }">
-                    <span v-on="on">
-                        <v-icon v-on="on">{{ $MDI.HelpCircleOutline }}</v-icon>
+                <template v-slot:activator="{ props }">
+                    <span v-bind="props">
+                        <v-icon v-bind="props">{{ $MDI.HelpCircleOutline }}</v-icon>
                     </span>
                 </template>
                 <span>
-                   Click on a structure to superpose it on to the cluster representative in the structure viewer
+                   Click on a structure to superpose it on to this entry in the structure viewer
                 </span>
             </v-tooltip>
         </template>
@@ -60,7 +71,7 @@
             <div v-ripple="{ class: `primary--text` }" style="text-align: center; cursor: pointer;" @click="$emit('select', prop.item.accession)">
                 <img :src="getImage(prop.item.accession)" style="height:75px"/>
             </div>
-        </template> -->
+        </template>
         <!-- <template v-slot:item.flag="prop">
             <Fragment :flag="prop.value"></Fragment>
         </template> -->
@@ -149,17 +160,17 @@ export default {
     data() {
         return {
             headers: [
-                // {
-                //     text: "Structure",
-                //     value: "structure",
-                //     sortable: false,
-                //     width: "10%",
-                // },
+                {
+                    title: "Structure",
+                    value: "structure",
+                    sortable: false,
+                    width: "15%",
+                },
                 {
                     title: "Accession",
                     value: "accession",
                     sortable: false,
-                    width: "35%",
+                    width: "30%",
                 },
                 // {
                 //     text: "Length",
@@ -176,7 +187,7 @@ export default {
                     title: "Taxonomy",
                     value: "tax_id",
                     sortable: false,
-                    width: "40%",
+                    width: "35%",
                 },
                 // {
                 //     text: 'Actions',
@@ -249,7 +260,7 @@ export default {
                 .then(response => {
                     this.members = response.data.result;
                     this.totalMembers = response.data.total;
-                    // this.fetchImages(this.members.map(m => m.accession));
+                    this.fetchImages(this.members.map(m => m.accession));
                 })
                 .catch(() => {})
                 .finally(() => {
