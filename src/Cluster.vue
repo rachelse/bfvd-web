@@ -1,7 +1,7 @@
 <template>
 
 <v-row style="margin:1em;">
-    <v-col cols="12" md="8">
+    <v-col cols="12" md="7" lg="8">
     <panel fill-height>
         <template v-slot:header>
             Entry: {{ response ? response.rep_accession : "Loading..." }}
@@ -136,7 +136,7 @@
                         </span>
                     </v-tooltip>-->
                 </h3>
-                <dl class="dl-4">
+                <dl class="dl-3">
                 <div>
                 <dt>
                     Number of members
@@ -153,15 +153,15 @@
                     {{ response.avg_len.toFixed(2) }} aa
                 </dd>
                 </div>
-                <div>
-                <!-- <dt>
+                <!-- <div>
+                <dt>
                     Average pLDDT
                 </dt>
                 <dd>
                     {{ response.avg_plddt.toFixed(2) }}
-                </dd> -->
-                </div>
-                <div style=" grid-area: 2 / 1 / 3 / 5;">
+                </dd>
+                </div> -->
+                <div style=" grid-area: 2 / 1 / 3 / 4;">
                 <dt>
                     Lowest common ancestor and lineage
                 </dt>
@@ -169,7 +169,7 @@
                     <template v-for="(taxonomy, index) in response.lineage" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></template>
                 </dd>
                 </div>
-                <!-- <div style=" grid-area: 3 / 1 / 3 / 5;">
+                <!-- <div style=" grid-area: 3 / 1 / 3 / 4;">
                     <dt>Annotations</dt>
                     <dd>
                         <Annotations :cluster="$route.params.cluster"></Annotations>
@@ -189,7 +189,7 @@
         </template>
     </panel>
     </v-col>
-    <v-col cols="12" md="4">
+    <v-col cols="12" md="5" lg="4">
     <Panel class="repr-structure" fill-height>
         <template v-slot:header>
             Representative structure
@@ -334,7 +334,7 @@ dt {
 
 @media screen and (min-width: 961px) {
     .repr-structure {
-        margin-left: 1em;
+        margin-left: 0.5em;
     }
 }
 
