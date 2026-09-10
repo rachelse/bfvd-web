@@ -4,7 +4,7 @@
         type="button"
         class="btn btn--raised btn--file"
         style="position: relative;"
-        :block="$vuetify.breakpoint.xsOnly"
+        :block="$vuetify.display.xs"
         @drop="fileDrop($event)"
         >
         <div class="btn__content" aria-hidden>

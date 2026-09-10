@@ -1,11 +1,11 @@
 <template>
     <v-chip-group
         row
-        dark
+        theme="dark"
         style="width: 100%; margin: 0 auto; "
     >
         
-        <v-chip v-for="item in pfams" :key="item.id" outlined :color="item.color">
+        <v-chip v-for="item in pfams" :key="item.id" variant="outlined" :color="item.color">
             <b>{{ item.pfam }}</b> &emsp; {{ item.hit }}
         </v-chip>
     </v-chip-group>

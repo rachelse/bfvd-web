@@ -5,7 +5,7 @@
         @upload="upload"
         :disabled="inSearch"
         :loading="inSearch"
-        x-large
+        size="x-large"
         :color="this.error ? 'error' : 'primary'"
         accept=".pdb,.mmcif,.cif,.mcif,chemical/x-pdb,chemical/x-cif,chemical/x-mmcif"
         v-bind="$attrs"

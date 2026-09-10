@@ -1,69 +1,67 @@
 <template>
 
 <v-row style="margin:1em;">
-    <v-flex xs12 md8>
-    <panel>
-        <template slot="header" v-if="response">
+    <v-col cols="12" md="7" lg="8">
+    <panel fill-height>
+        <template v-slot:header>
             Entry: {{ response ? response.rep_accession : "Loading..." }}
         </template>
 
-        <template slot="toolbar-extra">
+        <template v-slot:toolbar-extra>
             <v-chip v-if="response && response.warning == true" color="error">Warning</v-chip>
 
-            <v-menu offset-y left>
-                <template v-slot:activator="{ on: menu, attrs }">
-                    <v-btn plain v-bind="attrs" v-on="menu">
+            <!--
+                MSA/PAE download and MSA conservation are disabled for the
+                time being: none of them are provided yet.
+            -->
+            <v-menu v-if="false" offset-y left>
+                <template v-slot:activator="{ props }">
+                    <v-btn variant="plain" v-bind="props">
                         <v-icon>{{ $MDI.NotificationClearAll }}</v-icon>
                         MSA
                     </v-btn>
                 </template>
                 <v-list>
-                    <v-list-item :href="'https://bfvd.steineggerlab.workers.dev/a3m/' + response.rep_accession + '.a3m'">
-                        <v-list-item-icon>
+                    <v-list-item>
+                        <template v-slot:prepend>
                             <v-icon>{{ $MDI.FileDownloadOutline }}</v-icon>
-                        </v-list-item-icon>
-                        <v-list-item-content>
-                            <v-list-item-title>
-                                MSA (.a3m)
-                            </v-list-item-title>
-                        </v-list-item-content>
+                        </template>
+                        <v-list-item-title>
+                            MSA (.a3m)
+                        </v-list-item-title>
                     </v-list-item>
                     <v-list-item :href="'https://bfvd.steineggerlab.workers.dev/pae/' + response.rep_accession + '.json'">
-                        <v-list-item-icon>
+                        <template v-slot:prepend>
                             <v-icon>{{ $MDI.FileDownloadOutline }}</v-icon>
-                        </v-list-item-icon>
-                        <v-list-item-content>
-                            <v-list-item-title>
-                                PAE (.json)
-                            </v-list-item-title>
-                        </v-list-item-content>
+                        </template>
+                        <v-list-item-title>
+                            PAE (.json)
+                        </v-list-item-title>
                     </v-list-item>
                     <v-dialog v-model="dialog" fullscreen>
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-list-item v-bind="attrs" v-on="on">
-                                <v-list-item-icon>
+                        <template v-slot:activator="{ props }">
+                            <v-list-item v-bind="props">
+                                <template v-slot:prepend>
                                     <v-icon>{{ $MDI.ChartBarStacked }}</v-icon>
-                                </v-list-item-icon>
-                                <v-list-item-content>
-                                    <v-list-item-title>
-                                        Conservation
-                                    </v-list-item-title>
-                                </v-list-item-content>
+                                </template>
+                                <v-list-item-title>
+                                    Conservation
+                                </v-list-item-title>
                             </v-list-item>
                         </template>
 
                         <Panel>
-                            <template slot="header">
+                            <template v-slot:header>
                                 MSA conservation
                             </template>
 
-                            <template slot="toolbar-extra">
-                                <v-btn color="primary" text @click="dialog = false">
+                            <template v-slot:toolbar-extra>
+                                <v-btn color="primary" variant="text" @click="dialog = false">
                                     Close
                                 </v-btn>
                             </template>
-                            
-                            <template slot="content">
+
+                            <template v-slot:content>
                                 <MsaLogoPlot :accession="$route.params.cluster"></MsaLogoPlot>
                             </template>
                         </Panel>
@@ -72,7 +70,8 @@
             </v-menu>
         </template>
 
-        <template slot="content" v-if="response">
+        <template v-slot:content>
+            <template v-if="response">
             <h3>Representative summary</h3>
             <dl class="dl-4">
                 <div>
@@ -113,13 +112,13 @@
                     Taxonomy
                 </dt>
                 <dd>
-                    <template v-for="(taxonomy, index) in response.rep_lineage" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.rep_lineage.length -1)"> &#187;&nbsp;</template></template>
+                    <template v-for="(taxonomy, index) in response.rep_lineage" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.rep_lineage.length -1)"> &#187;&nbsp;</template></template>
                 </dd>
                 <dt v-if="response.hosts.length > 0">
                     Host
                 </dt>
                 <dd v-if="response.hosts.length > 0">
-                    <template v-for="(taxonomy, index) in response.hosts" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.hosts.length -1)"> ,&nbsp;</template></template>
+                    <template v-for="(taxonomy, index) in response.hosts" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.hosts.length -1)"> ,&nbsp;</template></template>
                 </dd>
                 </div>
                 </dl>
@@ -137,7 +136,7 @@
                         </span>
                     </v-tooltip>-->
                 </h3>
-                <dl class="dl-4">
+                <dl class="dl-3">
                 <div>
                 <dt>
                     Number of members
@@ -154,23 +153,23 @@
                     {{ response.avg_len.toFixed(2) }} aa
                 </dd>
                 </div>
-                <div>
-                <!-- <dt>
+                <!-- <div>
+                <dt>
                     Average pLDDT
                 </dt>
                 <dd>
                     {{ response.avg_plddt.toFixed(2) }}
-                </dd> -->
-                </div>
-                <div style=" grid-area: 2 / 1 / 3 / 5;">
+                </dd>
+                </div> -->
+                <div style=" grid-area: 2 / 1 / 3 / 4;">
                 <dt>
                     Lowest common ancestor and lineage
                 </dt>
                 <dd>
-                    <template v-for="(taxonomy, index) in response.lineage" ><TaxSpan :taxonomy="taxonomy" :key="taxonomy.id"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></template>
+                    <template v-for="(taxonomy, index) in response.lineage" :key="taxonomy.id"><TaxSpan :taxonomy="taxonomy"></TaxSpan><template v-if="index < (response.lineage.length -1)"> &#187;&nbsp;</template></template>
                 </dd>
                 </div>
-                <!-- <div style=" grid-area: 3 / 1 / 3 / 5;">
+                <!-- <div style=" grid-area: 3 / 1 / 3 / 4;">
                     <dt>Annotations</dt>
                     <dd>
                         <Annotations :cluster="$route.params.cluster"></Annotations>
@@ -186,39 +185,40 @@
                     This cluster was wrongly merged with another cluster. We are working on a fix.
                 </p>
             </template>
+            </template>
         </template>
     </panel>
-    </v-flex>
-    <v-flex xs12 md4>
-    <Panel class="repr-structure">
-        <template slot="header">
+    </v-col>
+    <v-col cols="12" md="5" lg="4">
+    <Panel class="repr-structure" fill-height>
+        <template v-slot:header>
             Representative structure
         </template>
         
-        <template slot="toolbar-extra">
-            <v-btn plain :href="'https://bfvd.steineggerlab.workers.dev/pdb/' + response.rep_accession + '.pdb'">
+        <template v-slot:toolbar-extra>
+            <v-btn v-if="response" variant="plain" :href="'https://bfvd.steineggerlab.workers.dev/pdb/' + response.rep_accession + '.pdb'">
                 <v-icon class="mr-1">{{ $MDI.FileDownloadOutline }}</v-icon>
                 PDB
             </v-btn>
         </template>
         
-        <template slot="content" v-if="response">
-            <StructureViewer v-if="$route.params.cluster" :cluster="$route.params.cluster" :second="second" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
+        <template v-slot:content>
+            <StructureViewer v-if="response && $route.params.cluster" :cluster="$route.params.cluster" :second="second" bgColorDark="#2e2e2e" @reset="second = ''"></StructureViewer>
         </template>
-p    </Panel>
-    </v-flex>
+    </Panel>
+    </v-col>
 
-    <v-flex xs12>
+    <v-col cols="12">
         <Members :cluster="$route.params.cluster" @select="(accession) => second = accession"></Members>
-    </v-flex>
+    </v-col>
 
-    <v-flex xs12>
+    <v-col cols="12">
         <Similars :cluster="$route.params.cluster" @select="(accession) => second = accession"></Similars>
-    </v-flex>
+    </v-col>
 
-    <v-flex xs12 class="mt-3">
+    <v-col cols="12" class="mt-3">
         <v-card rounded="0">
-            <v-flex>
+            <v-col>
             <v-card-title primary-title class="pb-0 mb-0">
                 <div class="text-h5 mb-0">Reference</div>
             </v-card-title>
@@ -229,9 +229,9 @@ p    </Panel>
                     Nucleic Acids Research,&nbsp;gkae1119,&nbsp;2024.
                 </p>
             </v-card-title>
-            </v-flex>
+            </v-col>
         </v-card>
-    </v-flex>
+    </v-col>
 </v-row>
 </template>
 
@@ -334,7 +334,7 @@ dt {
 
 @media screen and (min-width: 961px) {
     .repr-structure {
-        margin-left: 1em;
+        margin-left: 0.5em;
     }
 }
 

@@ -1,37 +1,36 @@
 <template>
 <Panel style="margin-top: 1em;" collapsible>
-    <template slot="header">
+    <template v-slot:header>
         Similar entries
     </template>
 
-    <template slot="toolbar-extra">
+    <template v-slot:toolbar-extra>
         <v-menu offset-y>
-            <template v-slot:activator="{ on }">
-                <v-btn plain v-on="on">
+            <template v-slot:activator="{ props }">
+                <v-btn variant="plain" v-bind="props">
                     <v-icon class="mr-1">{{ $MDI.Export }}</v-icon>
                     Export
                 </v-btn>
             </template>
             <v-list>
                 <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/similars?format=accessions&${requestOptions.params.toString()}`" target="_blank">
-                    <v-list-item-content>
-                        <v-list-item-title>Accessions</v-list-item-title>
-                    </v-list-item-content>
+                    <v-list-item-title>Accessions</v-list-item-title>
                 </v-list-item>
                 <v-list-item :href="`${$axios.defaults.baseURL}/cluster/${$route.params.cluster}/similars?format=fasta&${requestOptions.params.toString()}`" target="_blank">
-                    <v-list-item-content>
-                        <v-list-item-title>FASTA</v-list-item-title>
-                    </v-list-item-content>
+                    <v-list-item-title>FASTA</v-list-item-title>
                 </v-list-item>
             </v-list>
         </v-menu>
     </template>
 
-<template slot="content" v-if="$route.params.cluster">
+<template v-slot:content>
     <v-data-table
+        v-if="$route.params.cluster"
         :headers="headers"
         :items="entries"
-        :options.sync="options"
+        v-model:page="options.page"
+        v-model:items-per-page="options.itemsPerPage"
+        v-model:sort-by="options.sortBy"
         :server-items-length="totalEntries"
         :loading="loading"
         :footer-props="{
@@ -52,12 +51,12 @@
         <template v-slot:item.rep_plddt="prop">
             {{ prop.value.toFixed(2) }}
         </template>
-        <template v-slot:header.structure="{ header }">
-            {{ header.text }}
+        <template v-slot:header.structure="{ column }">
+            {{ column.title }}
             <v-tooltip top>
-                <template v-slot:activator="{ on }">
-                    <span v-on="on">
-                        <v-icon v-on="on">{{ $MDI.HelpCircleOutline }}</v-icon>
+                <template v-slot:activator="{ props }">
+                    <span v-bind="props">
+                        <v-icon v-bind="props">{{ $MDI.HelpCircleOutline }}</v-icon>
                     </span>
                 </template>
                 <span>
@@ -71,7 +70,7 @@
             </div>
         </template>
 
-        <template v-slot:header.lca_tax_id="{ header }">
+        <template v-slot:header.lca_tax_id="{ column }">
                 <TaxonomyAutocomplete
                     :cluster="cluster"
                     v-model="options.tax_id"
@@ -87,7 +86,7 @@
 
         <template v-slot:item.actions="{ item }">
             <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/search?accession=' + item.rep_accession + '&source=BFVD'" target="_blank" rel="noopener">
-                <v-img :src="require('./assets/marv-foldseek-small.png')" max-width="16"></v-img>
+                <img src="./assets/marv-foldseek-small.png" style="display: inline-block; width: 16px; height: 16px;" />
             </v-chip>
         </template>
     </v-data-table>
@@ -120,53 +119,63 @@ export default {
         return {
             headers: [
                 {
-                    text: "Structure",
+                    title: "Structure",
                     value: "structure",
                     sortable: false,
                 },
                 {
-                    text: "Accession",
+                    title: "Accession",
                     value: "rep_accession",
+                    sortable: true,
                 },
                 {
-                    text: "Average length",
+                    title: "Average length",
                     value: "avg_len",
+                    sortable: true,
                 },
                 // {
                 //     text: "Average pLDDT",
                 //     value: "avg_plddt",
                 // },
                 {
-                    text: "Number of members",
+                    title: "Number of members",
                     value: "n_mem",
+                    sortable: true,
                 },
                 {
-                    text: "Lowest common ancestor",
+                    title: "Lowest common ancestor",
                     value: "lca_tax_id",
                     sortable: false,
                 },
                 {
-                    text: "Singleton cluster",
+                    title: "Singleton cluster",
                     value: "is_dark",
+                    sortable: true,
                 },
                 {
-                    text: "Rep pLDDT",
+                    title: "Rep pLDDT",
                     value: "rep_plddt",
+                    sortable: true,
                 },
                 {
-                    text: "Rep length",
+                    title: "Rep length",
                     value: "rep_len",
+                    sortable: true,
                 },
                 {
-                    text: "E-value",
+                    title: "E-value",
                     value: "evalue",
+                    sortable: true,
                 },
-                { text: 'Actions', value: 'actions', sortable: false },
+                { title: 'Actions', value: 'actions', sortable: false },
             ],
             entries: [],
             totalEntries: 0,
             loading: false,
             options: {
+                page: 1,
+                itemsPerPage: 10,
+                sortBy: [],
                 tax_id: null,
             },
             taxAutocompleteDisabled: false,
@@ -183,6 +192,9 @@ export default {
             this.fetchData();
         }
     },
+    created() {
+        this.fetchData();
+    },
     computed: {
         requestOptions() {
             let copy = JSON.parse(JSON.stringify(this.options));
@@ -191,6 +203,9 @@ export default {
             } else {
                 delete copy.tax_id;
             }
+            const sort = (copy.sortBy && copy.sortBy[0]) || null;
+            copy.sortBy = sort ? sort.key : '';
+            copy.sortDesc = sort && sort.order === 'desc' ? 'true' : 'false';
             const params = new URLSearchParams(copy);
             params.sort();
             return { params };

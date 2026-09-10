@@ -1,18 +1,19 @@
 <template>
-    <v-flex xs12>
+    <v-col cols="12">
     <panel class="query-panel d-flex fill-height" fill-height>
-        <template slot="header">
+        <template v-slot:header>
             Entry selection
             <template v-if="$route.params.jobid">
                 for <a :href="'https://search.foldseek.com/result/' + $route.params.jobid + '/0'" target="_blank" rel="noopener">{{ $route.params.jobid }}</a>
             </template>
         </template>
     
-        <template slot="content">
+        <template v-slot:content>
             <v-data-table
                 :headers="headers"
                 :items="response"
-                :options.sync="options"
+                v-model:page="options.page"
+                v-model:items-per-page="options.itemsPerPage"
                 :server-items-length="total"
                 :footer-props="{
                     'items-per-page-options': [10, 20, 50, 100, -1],
@@ -28,7 +29,7 @@
     
                 <template v-slot:item.rep_accession="prop">
                     <ExternalLinks :accession="prop.value">
-                        <router-link slot="accession" :to="{ name: 'cluster', params: { cluster: prop.value }}" target='_blank'>{{ prop.value }}</router-link>
+                        <template v-slot:accession><router-link :to="{ name: 'cluster', params: { cluster: prop.value }}" target="_blank">{{ prop.value }}</router-link></template>
                     </ExternalLinks><br>
                     {{ prop.item.description }}
                 </template>
@@ -42,7 +43,7 @@
                     {{ prop.value.toFixed(2) }}
                 </template>
     
-                <template v-slot:header.lca_tax_id="{ header }">
+                <template v-slot:header.lca_tax_id="{ column }">
                     <TaxonomyAutocomplete
                         v-model="options.tax_id"
                         :urlFunction="(_, b) => '/search/foldseek/' + b"
@@ -55,13 +56,13 @@
                     <TaxSpan :taxonomy="prop.value"></TaxSpan>
                 </template>
     
-                <template v-slot:header.is_dark="{ header }">
+                <template v-slot:header.is_dark="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" :outlined="options.is_dark != null" plain>
-                                {{ header.text }}
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-bind="props" :variant="options.is_dark != null ? 'outlined' : 'plain'">
+                                {{ column.title }}
                             </v-btn>
                         </template>
     
@@ -79,65 +80,65 @@
                     <IsDark :isDark="prop.value"></IsDark>
                 </template>
     
-                <template v-slot:header.avg_len="{ header }">
+                <template v-slot:header.avg_len="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-bind="props" variant="plain">
+                                {{ column.title }}
                             </v-btn>
                         </template>
                         <RangeSlider :range="options.avg_length_range"></RangeSlider>
                     </v-menu>
                 </template>
     
-                <template v-slot:header.avg_plddt="{ header }">
+                <template v-slot:header.avg_plddt="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-bind="props" variant="plain">
+                                {{ column.title }}
                             </v-btn>
                         </template>
                         <RangeSlider :range="options.avg_plddt_range"></RangeSlider>
                     </v-menu>
                 </template>
     
-                <template v-slot:header.n_mem="{ header }">
+                <template v-slot:header.n_mem="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-bind="props" variant="plain">
+                                {{ column.title }}
                             </v-btn>
                         </template>
                         <RangeSlider :range="options.n_mem_range"></RangeSlider>
                     </v-menu>
                 </template>
     
-                <template v-slot:header.rep_len="{ header }">
+                <template v-slot:header.rep_len="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-bind="props" variant="plain">
+                                {{ column.title }}
                             </v-btn>
                         </template>
                         <RangeSlider :range="options.rep_length_range"></RangeSlider>
                     </v-menu>
                 </template>
     
-                <template v-slot:header.rep_plddt="{ header }">
+                <template v-slot:header.rep_plddt="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
-                        <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" plain>
-                                {{ header.text }}
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-bind="props" variant="plain">
+                                {{ column.title }}
                             </v-btn>
                         </template>
                         <RangeSlider :range="options.rep_plddt_range"></RangeSlider>
@@ -147,7 +148,7 @@
             </v-data-table>
         </template>
     </panel>
-    </v-flex>
+    </v-col>
     </template>
     
     <script>
@@ -177,13 +178,13 @@
                 page: null,
                 headers: [
                     {
-                        text: "Structure",
+                        title: "Structure",
                         value: "structure",
                         sortable: false,
                         width: "10%",
                     },
                     {
-                        text: "Accession",
+                        title: "Accession",
                         value: "rep_accession",
                         sortable: false,
                     },
@@ -192,12 +193,12 @@
                     //     value: "lca_tax_id.rank"
                     // },
                     {
-                        text: "LCA",
+                        title: "LCA",
                         value: "lca_tax_id",
                         sortable: false,
                     },
                     {
-                        text: "Avg. length",
+                        title: "Avg. length",
                         value: "avg_len",
                         sortable: false,
                     },
@@ -207,27 +208,29 @@
                     //     sortable: false,
                     // },
                     {
-                        text: "Members",
+                        title: "Members",
                         value: "n_mem",
                         sortable: false,
                     },
                     {
-                        text: "Singleton",
+                        title: "Singleton",
                         value: "is_dark",
                         sortable: false,
                     },
                     {
-                        text: "Rep. pLDDT",
+                        title: "Rep. pLDDT",
                         value: "rep_plddt",
                         sortable: false,
                     },
                     {
-                        text: "Rep. length",
+                        title: "Rep. length",
                         value: "rep_len",
                         sortable: false,
                     },
                 ],
                 options: {
+                    page: 1,
+                    itemsPerPage: 10,
                     avg_length_range: [0, Infinity],
                     avg_plddt_range: [0, Infinity],
                     rep_length_range: [0, Infinity],

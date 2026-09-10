@@ -6,9 +6,9 @@
             :class="{ hovered: hovered || isFullscreen }"
             @mouseover="hovered = true" @mouseleave="hovered = false"
             >
-            <v-tooltip open-delay="300" bottom attach=".structure-wrapper" background-color="transparent">
-                <template v-slot:activator="{ on }">
-                    <v-icon v-if="toolbar" :light="isFullscreen" v-on="on" class="help">{{ $MDI.HelpCircleOutline }}</v-icon>
+            <v-tooltip open-delay="300" bottom :attach="attachTarget" background-color="transparent">
+                <template v-slot:activator="{ props }">
+                    <v-icon v-if="toolbar" :theme="isFullscreen ? 'light' : undefined" v-bind="props" class="help">{{ $MDI.HelpCircleOutline }}</v-icon>
                 </template>
                 <span>
                     <dl style="text-align: center;">
@@ -48,7 +48,7 @@
                 </span>
             </v-tooltip>
             <div class="toolbar-panel" v-if="toolbar">
-                <v-item-group class="v-btn-toggle" :light="isFullscreen">
+                <v-item-group class="v-btn-toggle" :theme="isFullscreen ? 'light' : undefined">
                 <v-btn
                     v-if="secondComponent"
                     v-bind="tbButtonBindings"
@@ -100,10 +100,57 @@
 </template>
 
 <script>
-import { Shape, Stage, Selection, download, ColormakerRegistry, PdbWriter } from 'ngl';
+import { markRaw } from 'vue';
+import { createPluginUI } from 'molstar/lib/mol-plugin-ui/index.js';
+import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18.js';
+import { DefaultPluginUISpec } from 'molstar/lib/mol-plugin-ui/spec.js';
+import { StructureElement, StructureProperties as SP, Unit } from 'molstar/lib/mol-model/structure';
+import { StateTransforms } from 'molstar/lib/mol-plugin-state/transforms';
+import { Mat4 } from 'molstar/lib/mol-math/linear-algebra.js';
+import { PluginSpec } from 'molstar/lib/mol-plugin/spec.js';
+import { MAQualityAssessment } from 'molstar/lib/extensions/model-archive/quality-assessment/behavior.js';
+import { PluginConfig } from 'molstar/lib/mol-plugin/config.js';
+import { Color } from 'molstar/lib/mol-util/color/color.js';
+import { BfvdPlddtColorThemeProvider, plddtBinToScore } from './BfvdPlddtColorTheme.mjs';
 import Panel from './Panel.vue';
 import { pulchra } from 'pulchra-wasm';
 
+// Converts a CSS color (named "white"/"black", #rgb/#rrggbb hex, or
+// rgb()/rgba()) into the packed-integer Color Mol* expects.
+function cssColorToMolstarColor(css) {
+    if (css === 'white') return Color(0xffffff);
+    if (css === 'black') return Color(0x000000);
+    const rgb = css.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+    if (rgb) {
+        return Color.fromRgb(+rgb[1], +rgb[2], +rgb[3]);
+    }
+    let hex = css.startsWith('#') ? css.slice(1) : css;
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+    return Color(parseInt(hex, 16));
+}
+
+// The canvas is opaque (see initMolstar), so its background must match the
+// surrounding panel's actual rendered color exactly or a visible seam shows
+// where the two meet. Walk up the DOM for the real color instead of
+// guessing; bgColorLight/bgColorDark are only a fallback if none is found.
+function detectBackgroundColor(el, fallback) {
+    for (let node = el; node; node = node.parentElement) {
+        const bg = getComputedStyle(node).backgroundColor;
+        if (bg && bg !== 'transparent' && !/^rgba\([^)]*,\s*0\s*\)$/.test(bg)) {
+            return bg;
+        }
+    }
+    return fallback;
+}
+
+// Suppresses Mol*'s own floating viewport/selection controls (camera reset,
+// screenshot, settings, selection-mode icons, ...) - we only want our own
+// toolbar buttons overlaid on the structure.
+function EmptyControls() {
+    return null;
+}
 
 const worker = new Worker(new URL('./tmalign-worker.js', import.meta.url));
 const tmalign = function(pdb1, pdb2) {
@@ -118,16 +165,6 @@ const tmalign = function(pdb1, pdb2) {
     });
 };
 
-// Create NGL arrows from array of ([X, Y, Z], [X, Y, Z]) pairs
-// function createArrows(matches) {
-//     const shape = new Shape('shape')
-//     for (let i = 0; i < matches.length; i++) {
-//         const [a, b] = matches[i]
-//         shape.addArrow(a, b, [0, 1, 1], 0.4)
-//     }
-//     return shape
-// }
-
 const oneToThree = {
   "A":"ALA", "R":"ARG", "N":"ASN", "D":"ASP",
   "C":"CYS", "E":"GLU", "Q":"GLN", "G":"GLY",
@@ -140,13 +177,16 @@ const oneToThree = {
 /**
  * Create a mock PDB from Ca data
  * Follows the spacing spec from https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
- * Will have to change if/when swapping to fuller data
+ * pLDDT (a string of single-digit 0-9 confidence bins, one per residue) is baked
+ * into the B-factor column, rescaled to a 0-100 range so it lines up with
+ * Mol*'s built-in pLDDT-confidence color theme thresholds (<=50/<=70/<=90/>90).
  */
-function mockPDB(ca, seq) {
+function mockPDB(ca, seq, plddt) {
     const chainLength = ca.length / 3;
     const pdb = new Array()
     let j = 0;
     for (let i = 0; i < ca.length; i+=3, j++) {
+        const bfactor = plddt ? ((+(plddt[j])) + 0.5) * 10 : 100;
         const line = 'ATOM  '
             + j.toString().padStart(5)
             + '  CA  ' + oneToThree[seq != "" && (ca.length/3) == (seq.length - 1) ? seq[i/3] : 'A'] + ' A'
@@ -155,89 +195,98 @@ function mockPDB(ca, seq) {
             + ca[0 * chainLength + j].toString().padStart(8)
             + ca[1 * chainLength + j].toString().padStart(8)
             + ca[2 * chainLength + j].toString().padStart(8)
-            + '  1.00  0.00           C  ';
+            + '  1.00'
+            + bfactor.toFixed(2).padStart(6)
+            + '           C  ';
         pdb.push(line);
-        
+
     }
     return pdb.join('\n')
 }
 
-/* ------ The rotation matrix to rotate Chain_1 to Chain_2 ------ */
-/* m               t[m]        u[m][0]        u[m][1]        u[m][2] */
-/* 0     161.2708425765   0.0663961888  -0.6777150909  -0.7323208325 */
-/* 1     109.4205584665  -0.9559071424  -0.2536229340   0.1480437178 */
-/* 2      29.1924015422  -0.2860648199   0.6902011757  -0.6646722921 */
-/* Code for rotating Structure A from (x,y,z) to (X,Y,Z): */
-/* for(i=0; i<L; i++) */
-/* { */
-/*    X[i] = t[0] + u[0][0]*x[i] + u[0][1]*y[i] + u[0][2]*z[i]; */
-/*    Y[i] = t[1] + u[1][0]*x[i] + u[1][1]*y[i] + u[1][2]*z[i]; */
-/*    Z[i] = t[2] + u[2][0]*x[i] + u[2][1]*y[i] + u[2][2]*z[i]; */
-/* } */
-const transformStructure = (structure, t, u) => {
-    structure.eachAtom(atom => {
-        const [x, y, z] = [atom.x, atom.y, atom.z]
-        atom.x = t[0] + u[0][0] * x + u[0][1] * y + u[0][2] * z
-        atom.y = t[1] + u[1][0] * x + u[1][1] * y + u[1][2] * z
-        atom.z = t[2] + u[2][0] * x + u[2][1] * y + u[2][2] * z
-    })
-    return structure
+// pulchra's full-atom reconstruction re-emits ATOM lines without the
+// occupancy/B-factor columns at all. Mol* then reads occupancy as unset
+// (not 1.0), which makes its default hover label show a meaningless
+// "[occupancy ...]" suffix. Pad every atom line with an explicit,
+// valid occupancy so that never shows - pLDDT is shown via our own hover
+// label provider instead (see initMolstar).
+function padPdbFields(pdb) {
+    return pdb.split('\n').map(line => {
+        if (!line.startsWith('ATOM') && !line.startsWith('HETATM')) return line;
+        return line.padEnd(54) + '  1.00  0.00';
+    }).join('\n');
 }
 
-// Get XYZ coordinates of CA of a given residue
-const xyz = (structure, resIndex) => {
-    var rp = structure.getResidueProxy()
-    var ap = structure.getAtomProxy()
-    rp.index = resIndex
-    ap.index = rp.getAtomIndexByName('CA')
-    return [ap.x, ap.y, ap.z]
-}
+// Serialize a Mol* Structure back into PDB ATOM lines (Mol* has no direct
+// equivalent of NGL's PdbWriter for an arbitrary in-memory structure).
+function generatePdbAtoms(structureData) {
+    if (!structureData) return '';
+    const l = StructureElement.Location.create(structureData);
+    const atomLines = [];
 
-// Given an NGL AtomProxy, return the corresponding PDB line
-const atomToPDBRow = (ap) => {
-    const { serial, atomname, resname, chainname, resno, inscode, x, y, z } = ap
-    return `ATOM  ${serial.toString().padStart(5)}${atomname.padStart(4)}  ${resname.padStart(3)} ${chainname.padStart(1)}${resno.toString().padStart(4)} ${inscode.padStart(1)}  ${x.toFixed(3).padStart(8)}${y.toFixed(3).padStart(8)}${z.toFixed(3).padStart(8)}`
-}
+    for (const unit of structureData.units) {
+        const elements = unit.elements;
+        l.unit = unit;
 
-// Map 1-based indices in a selection to residue index/resno
-const makeChainMap = (structure, sele) => {
-    let idx = 1
-    let map = new Map()
-    structure.eachResidue(rp => { map.set(idx++, { index: rp.index, resno: rp.resno }) }, new Selection(sele))
-    return map
-}
+        for (let j = 0; j < elements.length; j++) {
+            l.element = elements[j];
 
-// Generate a subsetted PDB file from a structure and selection
-const makeSubPDB = (structure, sele) => {
-    let pdb = []
-    structure.eachAtom(ap => { pdb.push(atomToPDBRow(ap)) }, new Selection(sele))
-    return pdb.join('\n')
-}
+            const atomSerial = SP.atom.id(l).toString().padStart(5, ' ');
+            const rawAtomName = SP.atom.label_atom_id(l);
+            const atomName = rawAtomName.length < 4
+                ? ` ${rawAtomName}`.padEnd(4, ' ')
+                : rawAtomName.substring(0, 4);
+            const resName = SP.residue.label_comp_id(l).padStart(3, ' ').substring(0, 3);
+            let chainId = SP.chain.auth_asym_id(l) || SP.chain.label_asym_id(l) || 'A';
+            chainId = chainId.padStart(1, ' ').substring(0, 1);
+            const resSeq = SP.residue.label_seq_id(l).toString().padStart(4, ' ');
+            const x = SP.atom.x(l).toFixed(3).padStart(8, ' ');
+            const y = SP.atom.y(l).toFixed(3).padStart(8, ' ');
+            const z = SP.atom.z(l).toFixed(3).padStart(8, ' ');
+            const elementSymbol = SP.atom.type_symbol(l).padStart(2, ' ');
 
-var discreteBfactor = ColormakerRegistry.addScheme(function (params) {
-  this.atomColor = function (atom) {
-    if (atom.bfactor > 0.9) {
-      return 0x0000F5;  // blue
-    } else if (atom.bfactor > 0.7) {
-      return 0x00FFFF;  // cyan
-    } else if (atom.bfactor > 0.5) {
-      return 0xFFFF00;  // yellow
-    } else {
-      return 0xFFA500;  // orange
+            const line = `ATOM  ${atomSerial} ${atomName} ${resName} ${chainId}${resSeq}    ${x}${y}${z}  1.00  0.00           ${elementSymbol}  `;
+            atomLines.push(line);
+        }
     }
-  };
-});
+    return atomLines.join('\n');
+}
 
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function deleteTaggedState(plugin, tags) {
+    const allCells = Array.from(plugin.state.data.cells.values());
+    const cellsToDelete = allCells.filter(cell => {
+        const cellTags = cell.transform?.tags;
+        return Array.isArray(cellTags) && tags.some(tag => cellTags.includes(tag));
+    });
+    if (!cellsToDelete.length) return;
+    const update = plugin.build();
+    for (const cell of cellsToDelete) {
+        update.delete(cell.transform.ref);
+    }
+    await update.commit();
+}
 
 export default {
     components: { Panel },
     data: () => ({
-        stage: null,
+        plugin: null,
         component: null,
         secondComponent: null,
         tmOutput: null,
         'isFullscreen': false,
         'hovered': false,
+        plddt: null,
     }),
     props: {
         'cluster': { type: String, required: true },
@@ -248,68 +297,67 @@ export default {
     },
     methods: {
         handleResize() {
-            if (!this.stage) return
-            this.stage.handleResize()
+            if (!this.plugin) return
+            this.plugin.canvas3d?.handleResize()
         },
-        toggleFullscreen() {
-            if (!this.stage) return
-            this.stage.toggleFullscreen(this.$refs.structurepanel)
+        async toggleFullscreen() {
+            const element = this.$refs.structurepanel;
+            if (!document.fullscreenElement) {
+                if (element.requestFullscreen) {
+                    await element.requestFullscreen();
+                } else if (element.webkitRequestFullscreen) {
+                    await element.webkitRequestFullscreen();
+                }
+            } else if (document.exitFullscreen) {
+                await document.exitFullscreen();
+            }
         },
-        resetView() {
-            if (!this.stage) return
+        async resetView() {
+            if (!this.plugin) return
             if (this.secondComponent) {
-                this.secondComponent.removeAllRepresentations();
-                this.stage.removeComponent(this.secondComponent);
+                await this.plugin.build().delete(this.secondComponent).commit();
                 this.secondComponent = null;
-                this.component.removeAllRepresentations();
-                this.component.addRepresentation("cartoon", { color: discreteBfactor });
+                await deleteTaggedState(this.plugin, ['main-repr']);
+                await this.plugin.builders.structure.representation.addRepresentation(this.component, {
+                    type: 'cartoon',
+                    color: 'bfvd-plddt',
+                    colorParams: { plddt: this.plddt },
+                }, { tag: 'main-repr' });
                 this.$emit('reset', null);
             }
-            this.stage.autoView()
+            this.plugin.managers.camera.reset();
         },
-        makeImage() {
-            if (!this.stage) return
-            this.stage.viewer.setLight(undefined, undefined, undefined, 0.2)
-            this.stage.makeImage({
-                trim: true,
-                factor: (this.isFullscreen) ? 1 : 8,
-                antialias: true,
+        async makeImage() {
+            if (!this.plugin) return
+            const helper = this.plugin.helpers.viewportScreenshot;
+            helper.behaviors.values.next({
+                ...helper.values,
                 transparent: true,
-            }).then((blob) => {
-                this.stage.viewer.setLight(undefined, undefined, undefined, this.$vuetify.theme.dark ? 0.4 : 0.2)
-                download(blob, this.cluster + ".png")
-            })
+                format: { name: 'png', params: {} },
+            });
+            try {
+                await helper.download(`${this.cluster}.png`);
+            } catch (e) {
+                console.error("Error downloading image:", e);
+            }
         },
         makePdb() {
-            if (!this.stage) return;
+            if (!this.plugin) return;
             if (!this.component) return;
             if (!this.secondComponent) return;
-            const header = 
+            const header =
 `REMARK     This file was generated by the Foldseek clusters webserver:
 REMARK       https://cluster.foldseek.com
 REMARK     Please cite:
-REMARK       https://doi.org/10.1101/2023.03.09.531927 
+REMARK       https://doi.org/10.1101/2023.03.09.531927
 REMARK     Warning: Please refer to the original AFDB PDB files.
 REMARK       This file was auto-generated from compressed information:
 REMARK         * Non C-alpha atoms were re-generated by PULCHRA.
 REMARK         * pLDDTs were discretized into 0 to 9 bins.
 REMARK         * Residue/atom indices were sequentially renumbered`;
-//             if (!this.secondComponent) {
-//                 let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
-//                 pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-//                 let result =
-// `TITLE     ${this.cluster}
-// ${header}
-// ${pdb}
-// END
-// `;
-//                 download(new Blob([result], { type: 'text/plain' }), this.cluster + ".pdb");
-//             } else {
-                let pdb = new PdbWriter(this.component.structure, { renumberSerial: false }).getData();
-                pdb = pdb.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                let pdb2 = new PdbWriter(this.secondComponent.structure, { renumberSerial: false }).getData();
-                pdb2 = pdb2.split('\n').filter(line => line.startsWith('ATOM')).join('\n');
-                let result =
+            const pdb = generatePdbAtoms(this.component.obj.data);
+            const pdb2 = generatePdbAtoms(this.secondComponent.obj.data);
+            const result =
 `TITLE     ${this.cluster}+${this.second}
 ${header}
 MODEL        1
@@ -320,36 +368,117 @@ ${pdb2}
 ENDMDL
 END
 `;
-                download(new Blob([result], { type: 'text/plain' }), this.cluster + '+' + this.second + ".pdb");
-            // }
+            downloadBlob(new Blob([result], { type: 'text/plain' }), `${this.cluster}+${this.second}.pdb`);
         },
-        fetchStructure(accession) {
-            return this.$axios.get("/structure/" + accession)
-                .then((response) => {
-                    const plddt = response.data.plddt;
-                    return pulchra(mockPDB(response.data.coordinates, response.data.seq))
-                        .then((pdb) => {
-                            return this.stage.loadFile(new Blob([pdb], { type: 'text/plain' }), {ext: 'pdb', firstModelOnly: true})
-                        })
-                        .then((component) => {
-                            component.structure.eachAtom((ap) => {
-                                ap.bfactor = ((+(plddt[ap.resno]))+0.5)/10;
-                            });
-                            return component;
-                        })
-                })
-        }
+        async initMolstar() {
+            const fallback = this.$vuetify.theme.current.dark ? this.bgColorDark : this.bgColorLight;
+            const bgColor = detectBackgroundColor(this.$refs.structurepanel, fallback);
+            const defaultSpec = DefaultPluginUISpec();
+            const spec = {
+                ...defaultSpec,
+                // Drop the built-in hover label (entity/chain/polymer info we
+                // don't need) - our own lociLabels provider below replaces it
+                // with just residue type, residue number, and pLDDT.
+                behaviors: [
+                    ...defaultSpec.behaviors.filter(b => b.transformer.id !== 'default-loci-label-provider'),
+                    PluginSpec.Behavior(MAQualityAssessment),
+                ],
+                layout: {
+                    initial: {
+                        showControls: false,
+                        regionState: { right: 'hidden', top: 'hidden', left: 'hidden', bottom: 'hidden' }
+                    }
+                },
+                components: {
+                    remoteState: 'none',
+                    viewport: { controls: EmptyControls },
+                    selectionTools: { controls: EmptyControls },
+                },
+                config: [
+                    [PluginConfig.Viewport.ShowAnimation, false],
+                    [PluginConfig.Viewport.ShowTrajectoryControls, false],
+                ],
+                canvas3d: {
+                    // Deliberately opaque, not transparent: enabling real
+                    // transparency triggered a persistent WebGL rendering
+                    // artifact (Mol*'s postprocessing passes have a history of
+                    // transparency bugs). An opaque canvas painted the same
+                    // color as the surrounding panel (detectBackgroundColor,
+                    // above) looks identical for our solid-colored panels.
+                    transparentBackground: false,
+                    renderer: {
+                        backgroundColor: cssColorToMolstarColor(bgColor),
+                        pickingAlphaThreshold: 0.1,
+                    },
+                    camera: {
+                        helper: { axes: { name: 'off', params: {} } },
+                        fov: 60,
+                    },
+                    cameraClipping: {
+                        radius: 0,
+                        far: false,
+                        minNear: -1000,
+                    },
+                    postprocessing: {
+                        occlusion: { name: 'off', params: {} },
+                    },
+                },
+            };
+
+            this.plugin = markRaw(await createPluginUI({
+                target: this.$refs.viewport,
+                spec,
+                render: renderReact18
+            }));
+            this.plugin.representation.structure.themes.colorThemeRegistry.add(BfvdPlddtColorThemeProvider);
+            this.plugin.managers.lociLabels.addProvider({
+                label: (loci) => {
+                    if (!StructureElement.Loci.is(loci)) return undefined;
+                    const location = StructureElement.Stats.ofLoci(loci).firstElementLoc;
+                    if (!location || !Unit.isAtomic(location.unit)) return undefined;
+                    const residueIndex = location.unit.model.atomicHierarchy.residueAtomSegments.index[location.element];
+                    const label = [`<b>${SP.residue.label_comp_id(location)}</b> ${residueIndex + 1}`];
+                    if (this.plddt && loci.structure === this.component?.obj?.data) {
+                        const bin = this.plddt[residueIndex];
+                        if (bin !== undefined) {
+                            label.push(`pLDDT <b>${plddtBinToScore(bin).toFixed(1)}</b>`);
+                        }
+                    }
+                    return label.join(' &middot; ');
+                },
+            });
+        },
+        async loadPdbStructure(pdbString) {
+            const data = await this.plugin.builders.data.rawData({ data: pdbString });
+            const trajectory = await this.plugin.builders.structure.parseTrajectory(data, 'pdb');
+            const model = await this.plugin.builders.structure.createModel(trajectory);
+            const structure = await this.plugin.builders.structure.createStructure(model, { name: 'model', params: {} });
+            return markRaw(structure);
+        },
+        async fetchStructure(accession) {
+            const response = await this.$axios.get("/structure/" + accession);
+            const pdb = padPdbFields(await pulchra(mockPDB(response.data.coordinates, response.data.seq, response.data.plddt)));
+            const structure = await this.loadPdbStructure(pdb);
+            return { structure, plddt: response.data.plddt };
+        },
     },
     computed: {
+        attachTarget: function() {
+            // Only needed in native Fullscreen mode, where elements outside
+            // the fullscreened subtree aren't painted. Otherwise, use
+            // Vuetify's default body-level overlay - attaching here
+            // unconditionally clipped the tooltip behind the Mol* canvas.
+            return this.isFullscreen ? this.$refs.structurepanel : false;
+        },
         tbIconBindings: function() {
-            return (this.isFullscreen) ? { 'right': true } : {}
+            return (this.isFullscreen) ? { 'end': true } : {}
         },
         tbButtonBindings: function() {
             return (this.isFullscreen) ? {
-                'small': false,
+                'size': 'default',
                 'style': 'margin-bottom: 15px;',
             } : {
-                'small': true,
+                'size': 'small',
                 'style': ''
             }
         },
@@ -357,18 +486,26 @@ END
     watch: {
         'cluster': {
             handler() {
-                this.$nextTick(() => {
+                this.$nextTick(async () => {
                     if (!this.cluster) {
                         return;
                     }
-                    this.stage.removeAllComponents();
-                    this.fetchStructure(this.cluster)
-                        .then((component) => {
-                            this.component = component;
-                            this.component.addRepresentation("cartoon", { color: discreteBfactor });
-                            this.stage.autoView();
-                            return component;
-                        })
+                    await this._pluginReady;
+                    if (!this.plugin) {
+                        return;
+                    }
+                    await this.plugin.clear();
+                    this.component = null;
+                    this.secondComponent = null;
+                    const { structure, plddt } = await this.fetchStructure(this.cluster);
+                    this.component = structure;
+                    this.plddt = plddt;
+                    await this.plugin.builders.structure.representation.addRepresentation(this.component, {
+                        type: 'cartoon',
+                        color: 'bfvd-plddt',
+                        colorParams: { plddt: this.plddt },
+                    }, { tag: 'main-repr' });
+                    this.plugin.managers.camera.reset();
                 });
             },
             immediate: true,
@@ -378,79 +515,85 @@ END
                 if (this.second == "") {
                     return;
                 }
-                this.$nextTick(() => {
-                    this.stage.removeComponent(this.secondComponent);
-                    this.secondComponent = null;
-                    let tmpComponent = null
-                    this.fetchStructure(this.second)
-                        .then((component) => {
-                            tmpComponent = component;
-                            return component;
+                this.$nextTick(async () => {
+                    await this._pluginReady;
+                    if (!this.plugin || !this.component) return;
+                    if (this.secondComponent) {
+                        await this.plugin.build().delete(this.secondComponent).commit();
+                        this.secondComponent = null;
+                    }
+                    const { structure } = await this.fetchStructure(this.second);
+                    const refPdb = generatePdbAtoms(this.component.obj.data);
+                    const tarPdb = generatePdbAtoms(structure.obj.data);
+                    const tm = await tmalign(tarPdb, refPdb);
+                    this.tmOutput = tm.output;
+                    const { t, u } = tm.matrix;
+                    const mat = Mat4.ofRows([
+                        [u[0][0], u[0][1], u[0][2], t[0]],
+                        [u[1][0], u[1][1], u[1][2], t[1]],
+                        [u[2][0], u[2][1], u[2][2], t[2]],
+                        [0, 0, 0, 1]
+                    ]);
+
+                    await this.plugin.build()
+                        .to(structure)
+                        .insert(StateTransforms.Model.TransformStructureConformation, {
+                            transform: { name: 'matrix', params: { data: mat, transpose: false } }
                         })
-                        .then((c) => {
-                            let qSubPdb = makeSubPDB(this.component.structure,'')
-                            let tSubPdb = makeSubPDB(c.structure, '')
-                            return tmalign(tSubPdb, qSubPdb)
-                        })
-                        .then((tm) => {
-                            this.secondComponent = tmpComponent;
-                            this.tmOutput = tm.output;
-                            transformStructure(this.secondComponent.structure, tm.matrix.t, tm.matrix.u)
-                            this.component.removeAllRepresentations();
-                            this.component.addRepresentation("cartoon", { color: "#1E88E5" });
-                            this.secondComponent.addRepresentation("cartoon", { color: "#FFC107" });
-                            this.stage.autoView()
-                        })
+                        .commit();
+
+                    this.secondComponent = structure;
+
+                    await deleteTaggedState(this.plugin, ['main-repr']);
+                    await this.plugin.builders.structure.representation.addRepresentation(this.component, {
+                        type: 'cartoon',
+                        color: 'uniform',
+                        colorParams: { value: 0x1E88E5 },
+                    }, { tag: 'main-repr' });
+                    await this.plugin.builders.structure.representation.addRepresentation(this.secondComponent, {
+                        type: 'cartoon',
+                        color: 'uniform',
+                        colorParams: { value: 0xFFC107 },
+                    }, { tag: 'second-repr' });
+
+                    this.plugin.managers.camera.reset();
                 });
             },
             immediate: true,
         },
     },
-    mounted() {
-        const bgColor = this.$vuetify.theme.dark ? this.bgColorDark : this.bgColorLight;
-        const ambientIntensity = this.$vuetify.theme.dark ? 0.4 : 0.2;
-        this.stage = new Stage(this.$refs.viewport,{
-            backgroundColor: bgColor,
-            ambientIntensity: ambientIntensity,
-            clipNear: -1000,
-            clipFar: 1000,
-            fogFar: 1000,
-            fogNear: -1000,
-            quality: 'high',
-            tooltip: this.toolbar,
-        });
-
+    async mounted() {
+        this._pluginReady = this.initMolstar();
+        await this._pluginReady;
         window.addEventListener('resize', this.handleResize)
-        this.stage.signals.fullscreenChanged.add((isFullscreen) => {
-            if (isFullscreen) {
-                this.stage.viewer.setBackground('#ffffff')
-                this.stage.viewer.setLight(undefined, undefined, undefined, 0.2)
-                this.isFullscreen = true
-            } else {
-                this.stage.viewer.setBackground(bgColor)
-                this.stage.viewer.setLight(undefined, undefined, undefined, ambientIntensity)
-                this.isFullscreen = false
-            }
-        })
+        const fullscreenHandler = () => {
+            this.isFullscreen = !!document.fullscreenElement;
+            this.plugin?.canvas3d?.handleResize();
+            this.plugin?.managers.camera.reset();
+        };
+        document.addEventListener('fullscreenchange', fullscreenHandler);
+        document.addEventListener('webkitfullscreenchange', fullscreenHandler);
+        this._fullscreenHandler = fullscreenHandler;
     },
-    beforeDestroy() {
-        if (typeof(this.stage) == 'undefined')
-            return
-        this.stage.dispose() 
+    beforeUnmount() {
+        document.removeEventListener('fullscreenchange', this._fullscreenHandler);
+        document.removeEventListener('webkitfullscreenchange', this._fullscreenHandler);
         window.removeEventListener('resize', this.handleResize)
+        this.plugin?.dispose();
     }
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .structure-wrapper {
     margin: 0 auto;
     position: relative;
-    height: 300px;
+    height: 100%;
+    min-height: 300px;
     width: 100%;
 }
 
-.theme--dark .structure-wrapper .v-tooltip__content {
+.v-theme--dark .structure-wrapper .v-tooltip__content {
     background: rgba(97, 97, 97, 0.3);
 }
 
@@ -465,6 +608,7 @@ END
 
 .structure-panel {
     position: relative;
+    height: 100%;
 }
 
 .hovered .toolbar-panel {
@@ -480,13 +624,42 @@ END
     z-index: 1;
     left: 0;
 }
-.structure-wrapper.hovered >>> .help {
+.structure-wrapper.hovered :deep(.help) {
     display: inline-flex;
 }
-.structure-wrapper >>> .help {
+.structure-wrapper :deep(.help) {
     display: none;
     position: absolute;
     z-index: 999;
     right:0;
+}
+</style>
+
+<style lang="scss">
+@use 'molstar/lib/mol-plugin-ui/skin/light.scss';
+
+.msp-highlight-toast-wrapper {
+    z-index: 9999;
+    position: absolute !important;
+    left: 0px !important;
+    top: 0px !important;
+    width: fit-content;
+    pointer-events: none;
+}
+
+.msp-highlight-toast-wrapper:empty {
+    display: none !important;
+}
+
+.msp-highlight-toast-wrapper .msp-highlight-info {
+    white-space: nowrap;
+    color: white !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    padding: 4px 4px !important;
+    border-radius: 4px !important;
+}
+
+.msp-plugin canvas {
+    position: relative;
 }
 </style>

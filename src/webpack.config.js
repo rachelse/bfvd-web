@@ -3,9 +3,8 @@ const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
 const { SubresourceIntegrityPlugin } = require('webpack-subresource-integrity');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const { VueLoaderPlugin } = require('vue-loader');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const VuetifyLoaderPlugin = require('vuetify-loader/lib/plugin');
 const ImageMinimizerPlugin = require("image-minimizer-webpack-plugin");
 const fs = require('fs');
 
@@ -43,7 +42,6 @@ module.exports = (env, argv) => {
                         },
                         include: [
                             path.resolve(__dirname),
-                            path.resolve(__dirname, '../node_modules/vuetify/src'),
                         ]
                     }
                 },
@@ -52,11 +50,10 @@ module.exports = (env, argv) => {
                     loader: 'babel-loader',
                     include: [
                         path.resolve(__dirname),
-                        path.resolve(__dirname, '../node_modules/vuetify/src')
                     ]
                 },
                 {
-                    test: /\.(png|jpe?g|gif|svg|ttf|woff2?|eot|wasm)(\?.*)?$/,
+                    test: /\.(png|jpe?g|gif|svg|ttf|woff2?|eot|wasm|ico)(\?.*)?$/,
                     type: 'asset/resource'
                 },
                 {
@@ -71,10 +68,10 @@ module.exports = (env, argv) => {
                         {
                             loader: 'sass-loader',
                             options: {
+                                api: 'modern',
                                 sassOptions: {
-                                    includePaths: [path.resolve(__dirname, "assets")]
-                                },
-                                additionalData: `@import "_variables.scss"`
+                                    loadPaths: [path.resolve(__dirname, "assets"), path.resolve(__dirname, "../node_modules")]
+                                }
                             }
                         }
                     ]
@@ -87,10 +84,10 @@ module.exports = (env, argv) => {
                         {
                             loader: 'sass-loader',
                             options: {
+                                api: 'modern',
                                 sassOptions: {
-                                    includePaths: [path.resolve(__dirname, "assets")]
-                                },
-                                additionalData: `@import "_variables.scss";`
+                                    loadPaths: [path.resolve(__dirname, "assets"), path.resolve(__dirname, "../node_modules")]
+                                }
                             }
                         }
                     ]
@@ -100,7 +97,7 @@ module.exports = (env, argv) => {
         resolve: {
             extensions: ['.js', '.vue', '.json'],
             alias: {
-                'vue$': 'vue/dist/vue.runtime.esm.js'
+                'vue$': 'vue/dist/vue.runtime.esm-bundler.js'
             }
         },
         experiments: {
@@ -112,9 +109,11 @@ module.exports = (env, argv) => {
                 'process.env': {
                     NODE_ENV: JSON.stringify(argv.mode)
                 },
+                __VUE_OPTIONS_API__: true,
+                __VUE_PROD_DEVTOOLS__: !isProduction,
+                __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: !isProduction,
             }),
             new VueLoaderPlugin(),
-            new VuetifyLoaderPlugin(),
             new HtmlWebpackPlugin({
                 template: path.resolve(__dirname, './index.html'),
             }),
@@ -137,7 +136,7 @@ module.exports = (env, argv) => {
                 },
             }) : new NullPlugin(),
         ],
-        devtool: isProduction ? 'source-map' : 'eval-source-map'
+        devtool: isProduction ? 'source-map' : 'cheap-module-source-map'
     }
 
     if (!isProduction) {

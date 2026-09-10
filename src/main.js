@@ -1,9 +1,12 @@
-import Vue from 'vue';
-import VueRouter from 'vue-router';
-import Vuetify from 'vuetify/lib';
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import { createVuetify } from 'vuetify';
+import * as vuetifyComponents from 'vuetify/components';
+import * as vuetifyDirectives from 'vuetify/directives';
+import { aliases, mdi } from 'vuetify/iconsets/mdi-svg';
+import 'vuetify/styles';
 import { create } from 'axios';
-import Portal from './lib/vue-simple-portal';
-import { NglService } from './NglService.mjs';
+import { MolstarService } from './MolstarService.mjs';
 
 import {
     mdiHistory,
@@ -39,18 +42,14 @@ import {
     mdiChartBarStacked,
 } from '@mdi/js'
 
-Vue.use(VueRouter);
-Vue.use(Vuetify);
-Vue.use(Portal);
-
 import App from './App.vue';
 import Search from './Search.vue';
 import Cluster from './Cluster.vue';
 
 window.document.title = "BFVD";
 
-const router = new VueRouter({
-    mode: 'history',
+const router = createRouter({
+    history: createWebHistory(),
     routes: [
         { path: '/', redirect: { name: 'search' } },
         { name: 'search', path: '/', component: Search },
@@ -71,74 +70,78 @@ const router = new VueRouter({
 
 const mq = window.matchMedia('(prefers-color-scheme: dark)')
 
-const vuetify = new Vuetify({
+const vuetify = createVuetify({
+    components: vuetifyComponents,
+    directives: vuetifyDirectives,
     icons: {
-        iconfont: 'mdiSvg',
+        defaultSet: 'mdiSvg',
+        aliases,
+        sets: {
+            mdiSvg: mdi,
+        },
     },
-    theme: { dark: mq.matches },
+    theme: {
+        defaultTheme: mq.matches ? 'dark' : 'light',
+    },
 })
 
 mq.addEventListener('change', (e) => {
-    vuetify.framework.theme.dark = e.matches;
+    vuetify.theme.change(e.matches ? 'dark' : 'light');
 })
 
-Vue.use({
-    install(Vue, options) {
-        Vue.prototype.$MDI = {
-            History: mdiHistory,
-            ChevronLeft: mdiChevronLeft,
-            ChevronRight: mdiChevronRight,
-            ClockOutline: mdiClockOutline,
-            AlertCircleOutline: mdiAlertCircleOutline,
-            HelpCircleOutline: mdiHelpCircleOutline,
-            Magnify: mdiMagnify,
-            Tune: mdiTune,
-            Dns: mdiDns,
-            ReorderHorizontal: mdiReorderHorizontal,
-            Delete: mdiDelete,
-            FileDownloadOutline: mdiFileDownloadOutline,
-            CloudDownloadOutline: mdiCloudDownloadOutline,
-            FormatListBulleted: mdiFormatListBulleted,
-            Label: mdiLabel,
-            LabelOutline: mdiLabelOutline,
-            NotificationClearAll: mdiNotificationClearAll,
-            ProgressWrench: mdiProgressWrench,
-            Restore: mdiRestore,
-            Fullscreen: mdiFullscreen,
-            ArrowRightCircle: mdiArrowRightCircle,
-            ArrowRightCircleOutline: mdiArrowRightCircleOutline,
-            Circle: mdiCircle,
-            CircleHalf: mdiCircleHalf,
-            PlusBox: mdiPlusBox,
-            MinusBox: mdiMinusBox,
-            DotsVertical: mdiDotsVertical,
-            OpenInNew: mdiOpenInNew,
-            GitHub: mdiGithub,
-            Export: mdiExport,
-            ChartBarStacked: mdiChartBarStacked
-        };
-        // let apiBase = "http://localhost:3000/api";
-        // let apiBase = "https://cluster.foldseek.com/api";
-        // let apiBase = "https://bfvd.foldseek.com/api";
-        let apiBase = "/api";
-        let defaultHeaders = {};
+const $MDI = {
+    History: mdiHistory,
+    ChevronLeft: mdiChevronLeft,
+    ChevronRight: mdiChevronRight,
+    ClockOutline: mdiClockOutline,
+    AlertCircleOutline: mdiAlertCircleOutline,
+    HelpCircleOutline: mdiHelpCircleOutline,
+    Magnify: mdiMagnify,
+    Tune: mdiTune,
+    Dns: mdiDns,
+    ReorderHorizontal: mdiReorderHorizontal,
+    Delete: mdiDelete,
+    FileDownloadOutline: mdiFileDownloadOutline,
+    CloudDownloadOutline: mdiCloudDownloadOutline,
+    FormatListBulleted: mdiFormatListBulleted,
+    Label: mdiLabel,
+    LabelOutline: mdiLabelOutline,
+    NotificationClearAll: mdiNotificationClearAll,
+    ProgressWrench: mdiProgressWrench,
+    Restore: mdiRestore,
+    Fullscreen: mdiFullscreen,
+    ArrowRightCircle: mdiArrowRightCircle,
+    ArrowRightCircleOutline: mdiArrowRightCircleOutline,
+    Circle: mdiCircle,
+    CircleHalf: mdiCircleHalf,
+    PlusBox: mdiPlusBox,
+    MinusBox: mdiMinusBox,
+    DotsVertical: mdiDotsVertical,
+    OpenInNew: mdiOpenInNew,
+    GitHub: mdiGithub,
+    Export: mdiExport,
+    ChartBarStacked: mdiChartBarStacked
+};
 
-        const axiosConfig = {
-            baseURL: apiBase,
-            headers: defaultHeaders
-        };
+// let apiBase = "http://localhost:3000/api";
+// let apiBase = "https://cluster.foldseek.com/api";
+// let apiBase = "https://bfvd.foldseek.com/api";
+let apiBase = "/api";
+let defaultHeaders = {};
 
-        Vue.prototype.$axios = create(axiosConfig);
-        Vue.prototype.$nglService = new NglService();
-    }
-});
+const axiosConfig = {
+    baseURL: apiBase,
+    headers: defaultHeaders
+};
 
-const app = new Vue({
-    el: '#app',
-    router,
-    vuetify,
-    render: h => h(App)
-});
+const app = createApp(App);
+app.config.globalProperties.$MDI = $MDI;
+app.config.globalProperties.$axios = create(axiosConfig);
+app.config.globalProperties.$molstarService = new MolstarService();
+app.use(router);
+app.use(vuetify);
 
 // make sure our CSS is load last
 import './assets/style.css';
+
+app.mount('#app');

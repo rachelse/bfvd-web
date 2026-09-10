@@ -4,17 +4,19 @@
         :allow-overflow="false"
         :items="items"
         :loading="isLoading"
-        :search-input.sync="search"
-        :value="value"
-        @input="change"
+        v-model:search="search"
+        :model-value="modelValue"
+        item-title="text"
+        item-value="value"
+        @update:model-value="change"
         placeholder="Taxonomic filter"
         hide-no-data
         return-object
         auto-select-first
         clearable
     >
-        <template v-slot:item="{ item }">
-                {{ item.text }} ({{ item.rank }})
+        <template v-slot:item="{ item, props }">
+            <v-list-item v-bind="props" :title="item.raw?.text" :subtitle="item.raw?.rank"></v-list-item>
         </template>
     </v-autocomplete>
 </template>
@@ -24,8 +26,9 @@ import { debounce } from './lib/debounce';
 
 export default {
     props: [
-        'value', 'cluster', 'urlFunction', 'disabled', 'options',
+        'modelValue', 'cluster', 'urlFunction', 'disabled', 'options',
     ],
+    emits: ['update:modelValue'],
     data() {
         return {
             items: [],
@@ -34,14 +37,14 @@ export default {
         }
     },
     mounted() {
-        this.items = [ this.value ];
+        this.items = this.modelValue ? [ this.modelValue ] : [];
     },
     watch: {
-        value(val) {
-            this.items = [ val ];
+        modelValue(val) {
+            this.items = val ? [ val ] : [];
         },
         search(val) {
-            if (val && val.length > 2 && val !== this.value) {
+            if (val && val.length > 2 && val !== this.modelValue) {
                 this.querySelections(val)
             }
         },
@@ -52,7 +55,7 @@ export default {
             return value;
         },
         change(taxId) {
-            this.$emit('input', taxId);
+            this.$emit('update:modelValue', taxId);
         },
         querySelections: debounce(function (name) {
             this.loading = true;

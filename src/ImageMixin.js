@@ -20,7 +20,7 @@ export default {
             for (let i = 0; i < accessions.length; i++) {
                 this.$axios.get("/structure/" + accessions[i])
                     .then((response) => {
-                        this.$nglService.makeImage(response.data.seq, response.data.plddt, response.data.coordinates)
+                        this.$molstarService.makeImage(response.data.seq, response.data.plddt, response.data.coordinates)
                             .then((image) => {
                                 this.images.push({ accession: accessions[i], url: URL.createObjectURL(image) });
                             })
