@@ -70,6 +70,22 @@ function getDescription(accession) {
     }
 }
 
+// BFVD v2 is entry-centric: every entry has its own structure and its own page, and
+// `cluster` only groups entries by sequence clustering (30% id / 90% cov) to drive the
+// members panel. The API keeps v1's rep_* field names so the frontend is unchanged --
+// same reasoning as keeping the /api/cluster/ routes -- so the entry's own columns are
+// aliased here rather than renamed everywhere.
+const ENTRY_COLS = `
+    e.accession  AS rep_accession,
+    e.len        AS rep_len,
+    e.plddt      AS rep_plddt,
+    e.tax_id     AS tax_id,
+    e.flag       AS flag,
+    e.cluster_id AS cluster_id,
+    c.n_mem, c.avg_len, c.avg_plddt, c.is_singleton, c.lca_tax_id`;
+
+const ENTRY_FROM = `FROM entry AS e JOIN cluster AS c ON e.cluster_id = c.cluster_id`;
+
 const app = express();
 app.use(cors());
 app.use(express.text({
@@ -184,16 +200,16 @@ app.get('/api/search/lca/:taxonomy?', async (req, res) => {
     queries_where.push(`c.avg_len >= ? AND c.avg_len <= ?`);
     queries_where.push(`c.avg_plddt >= ? AND c.avg_plddt <= ?`);
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
-    queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
+    queries_where.push(`e.len >= ? AND e.len <= ?`);
+    queries_where.push(`e.plddt >= ? AND e.plddt <= ?`);
     if (is_singleton != undefined) {
         queries_where.push(`c.is_singleton == ?`);
         filter_params.push(is_singleton)
     }
 
     let result = await sql.all(`
-    SELECT DISTINCT * 
-        FROM cluster as c 
+    SELECT DISTINCT ${ENTRY_COLS}
+        ${ENTRY_FROM}
         WHERE ${queries_where.join(" AND ")}
     `, taxid, ...filter_params);
 
@@ -264,8 +280,8 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
     queries_where.push(`c.avg_len >= ? AND c.avg_len <= ?`);
     queries_where.push(`c.avg_plddt >= ? AND c.avg_plddt <= ?`);
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
-    queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
+    queries_where.push(`e.len >= ? AND e.len <= ?`);
+    queries_where.push(`e.plddt >= ? AND e.plddt <= ?`);
     if (is_singleton != undefined) {
         queries_where.push(`c.is_singleton == ?`);
         filter_params.push(is_singleton ? '1' : '0')
@@ -273,20 +289,17 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
 
     const accessions = results.map(r => r.accession);
     let result = await sql.all(`
-        SELECT DISTINCT *
-            FROM cluster as c
-            WHERE c.rep_accession in (
-                SELECT DISTINCT rep_accession
-                FROM member
-                WHERE accession IN (${accessions.map(() => '?').join(',')})
-            ) AND ${queries_where.join(" AND ")}
+        SELECT DISTINCT ${ENTRY_COLS}
+            ${ENTRY_FROM}
+            WHERE e.accession IN (${accessions.map(() => '?').join(',')})
+              AND ${queries_where.join(" AND ")}
             `, ...accessions, ...filter_params);
 
     return finalizeResult(result, req, res);
 });
 
 app.get('/api/:query', async (req, res) => {
-    let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.rep_accession == c.rep_accession WHERE m.accession = ?", req.params.query);
+    let result = await sql.get(`SELECT ${ENTRY_COLS} ${ENTRY_FROM} WHERE e.accession = ?`, req.params.query);
     if (!result || result.lca_tax_id == null) {
         res.status(404).send({ error: "No cluster found" });
         return;
@@ -297,11 +310,6 @@ app.get('/api/:query', async (req, res) => {
 
 app.get('/api/cluster/:cluster/annotations', async (req, res) => {
     const cluster = req.params.cluster;
-    // let result = await sql.all(`
-    // SELECT tax_id
-    //     FROM member
-    //     WHERE rep_accession == ?;
-    // `, cluster);
 
     function color_designation(high_color, low_color, annotations) {
         let highest_hit = 0;
@@ -416,8 +424,8 @@ app.get('/api/cluster/:cluster/sankey-members', async (req, res) => {
     const cluster = req.params.cluster;
     let result = await sql.all(`
     SELECT tax_id
-        FROM member
-        WHERE rep_accession == ?;
+        FROM entry
+        WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?);
     `, cluster);
     res.send({result: makeSankey(result)});
 });
@@ -434,15 +442,15 @@ app.get('/api/cluster/:cluster/sankey-similars', async (req, res) => {
     ids_evalue.splice(-1);
     const accessions = ids_evalue.map((x) => x[0]).filter((x) => x != cluster);
     let result = await sql.all(`
-    SELECT DISTINCT lca_tax_id as tax_id
-        FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+    SELECT DISTINCT tax_id
+        FROM entry
+        WHERE accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     res.send({result: makeSankey(result)});
 });
 
 app.get('/api/cluster/:cluster', async (req, res) => {
-    let result = await sql.get("SELECT * FROM cluster as c LEFT JOIN member as m ON c.rep_accession == m.accession WHERE c.rep_accession = ?", req.params.cluster);
+    let result = await sql.get(`SELECT ${ENTRY_COLS} ${ENTRY_FROM} WHERE e.accession = ?`, req.params.cluster);
     if (!result) {
         res.status(404).send({ error: "No cluster found" });
         return;
@@ -466,6 +474,31 @@ app.get('/api/cluster/:cluster', async (req, res) => {
     } else {
         result.warning = false;
     }
+    // Species comes off the NCBI tree rather than a stored ICTV name: resolved to its
+    // species-rank ancestor, the NCBI scientific name equals the ICTV species for
+    // 176,302 of 176,330 mapped taxids, so storing both would only add a way to disagree.
+    result.species = null;
+    if (result.rep_lineage) {
+        const species = result.rep_lineage.find((x) => x.rank === "species");
+        if (species) {
+            result.species = species;
+        }
+    }
+
+    // ICTV identity for outbound links. Absent values are the literal 'NA' rather than
+    // NULL, so normalize them away before they reach the UI.
+    const ictv = await sql.get("SELECT ictv_id, ictv_accession, ictv_host, mapping_step FROM ictv WHERE tax_id = ?", String(result.tax_id ? result.tax_id.id : ''));
+    const notNA = (v) => (v && v !== 'NA') ? v : null;
+    result.ictv = ictv ? {
+        id: notNA(ictv.ictv_id),
+        accessions: notNA(ictv.ictv_accession) ? ictv.ictv_accession.split(';') : [],
+        host_category: notNA(ictv.ictv_host),
+        mapping_step: notNA(ictv.mapping_step),
+    } : { id: null, accessions: [], host_category: null, mapping_step: null };
+
+    // UniProt gives a specific host organism with a taxid; ICTV only a coarse category.
+    // They are different granularities, so they are never merged -- prefer UniProt, fall
+    // back to the ICTV category, and let the UI say "NA" when neither exists.
     let hosts = await sql.all("SELECT tax_id FROM taxonomy_host WHERE accession = ?", req.params.cluster);
     result.hosts = [];
     if (hosts) {
@@ -476,6 +509,9 @@ app.get('/api/cluster/:cluster', async (req, res) => {
             }
         }
     }
+    result.host_source = result.hosts.length > 0
+        ? 'uniprot'
+        : (result.ictv.host_category ? 'ictv' : null);
 
     res.send(result);
 });
@@ -505,8 +541,8 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
     if (req.query.tax_id) {
         result = await sql.all(`
         SELECT accession, tax_id, flag
-            FROM member
-            WHERE rep_accession = ? ${flagFilter}
+            FROM entry
+            WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?) ${flagFilter}
             ORDER BY rowid;
         `, ...args);
         
@@ -535,7 +571,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
     } else {
         let paginate_query = "";
         if (paginate) {
-            total = await sql.get(`SELECT COUNT(accession) as total FROM member WHERE rep_accession = ? ${flagFilter}`, ...args);
+            total = await sql.get(`SELECT COUNT(accession) as total FROM entry WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?) ${flagFilter}`, ...args);
             total = total.total;
             args.push((req.query.itemsPerPage) | 0);
             args.push(((req.query.page - 1) * req.query.itemsPerPage) | 0);
@@ -543,8 +579,8 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
         }
         result = await sql.all(`
         SELECT accession, tax_id, flag
-            FROM member
-            WHERE rep_accession = ? ${flagFilter}
+            FROM entry
+            WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?) ${flagFilter}
             ORDER BY rowid
             ${paginate_query};
         `, ...args);
@@ -592,8 +628,8 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
 app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
     let result = await sql.all(`
         SELECT tax_id
-            FROM member
-            WHERE rep_accession = ?;
+            FROM entry
+            WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?);
         `, req.params.cluster); 
     let suggestions = {};
     let count = 0;
@@ -631,8 +667,8 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
     const accessions = ids_evalue.map((x) => x[0]);
     let result = await sql.all(`
     SELECT *
-        FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+        ${ENTRY_FROM}
+        WHERE e.accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     result.forEach((x) => {
         x.evalue = map.get(x.rep_accession);
@@ -735,8 +771,8 @@ app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => 
     const accessions = ids_evalue.map((x) => x[0]);
     let result = await sql.all(`
     SELECT *
-        FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+        ${ENTRY_FROM}
+        WHERE e.accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     let suggestions = {};
     let count = 0;

@@ -218,14 +218,16 @@ lets `Members.vue`'s commented-out flag filter be re-enabled.
 **5.2 Remove GO — done.** Deleted `GoAutocomplete.vue`, `GoSearchResult.vue`; drop imports and
 the already-commented tab from `Search.vue`; delete two endpoints from `index.mjs`.
 
-**5.3 Entry-centric server** — 10 query sites in `index.mjs`. Pattern: `cluster` becomes
+**5.3 Entry-centric server — done.** 10 query sites in `index.mjs`. Pattern: `cluster` becomes
 `entry`, and members go from `WHERE rep_accession = ?` to
 `WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?) AND accession != ?`.
 One bug fixes itself: the member FASTA export (`:644`) is broken in v1 because `afdb`
 held only representatives; in v2 every entry has a sequence.
 
-**5.4 Entry page** — species from the NCBI lineage (§3.8), ICTV id + GenBank accession
-links, host fallback UniProt → ICTV → `NA`, and the §3.11 tooltip.
+**5.4 Entry page** — the API now returns `species` (resolved from the NCBI lineage,
+§3.8), `ictv` (`id`, `accessions[]`, `host_category`, `mapping_step`, with `'NA'`
+normalized to `null`) and `host_source` (`uniprot` | `ictv` | `null`). Still to do:
+render them in `Cluster.vue`, plus the §3.11 members tooltip.
 
 ---
 
@@ -266,7 +268,8 @@ script: it cannot run until the entry-centric server changes land. See §7.
 | 10. `ava_db` | — | blocked: file still copying (§8) |
 | 11a. Code: `is_singleton` rename + `flag` (§5.1) | — | **done** — frontend builds clean, no `is_dark` left in `src/` |
 | 11b. Code: remove GO (§5.2) | — | **done** — endpoints, components, route and dead helper all gone |
-| 12. Code: entry-centric server + entry page (§5.3–5.4) | — | not started; **the server cannot read this DB until it lands** |
+| 12a. Code: entry-centric server (§5.3) | — | **done** — no v1 table references remain |
+| 12b. Code: entry page UI (§5.4) | — | server now returns `species`, `ictv` and `host_source`; the Vue side is not wired up yet |
 | 13. Swap `out/` → `data/` | — | **yours** (§3.16) |
 
 **Staged dataset: `/home/user2/bfvd-web/data-bfvd2/out/`, 14 GB.** `afdb`, `afdb_ca`, `afdb_plddt`,
