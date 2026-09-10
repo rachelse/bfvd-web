@@ -234,8 +234,10 @@ export default {
             }
             this.$axios.get("/cluster/" + cluster + "/similars", this.requestOptions)
                 .then(response => {
-                    this.entries = response.data.similars;
-                    this.totalEntries = response.data.total;
+                    // Without an ava_db the endpoint answers a bare [], which has no
+                    // .similars -- default rather than blowing up in .map below.
+                    this.entries = response.data.similars ?? [];
+                    this.totalEntries = response.data.total ?? 0;
                     this.fetchImages(this.entries.map(m => m.accession));
                 })
                 .catch(() => {})

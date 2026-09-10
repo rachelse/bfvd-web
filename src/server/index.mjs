@@ -811,20 +811,30 @@ app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => 
 
 app.get('/api/structure/:structure', async (req, res) => {
     const structure = req.params.structure;
+
+    // An unknown accession is a client asking for something that does not exist, not a
+    // server fault: answer 404 rather than throwing a 500 with a stack trace. A stale
+    // frontend sending the literal string "undefined" used to log one per request.
+    const notFound = (db) => {
+        res.status(404);
+        res.removeHeader('Cache-Control');
+        res.send({ error: `${structure} not found in ${db}` });
+    };
+
     const aaKey = aaDb.id(structure);
     if (aaKey.found == false) {
-        throw Error(`${structure} not found in aa db`);
+        return notFound('the sequence database');
     }
     const aaLength = aaDb.length(aaKey.value) - 2;
 
     const key = caDb.id(structure);
     if (key.found == false) {
-        throw Error(`${structure} not found in ca db`);
+        return notFound('the coordinate database');
     }
 
     const plddtKey = plddtDB.id(structure);
     if (plddtKey.found == false) {
-        throw Error(`${structure} not found in plddt db`);
+        return notFound('the pLDDT database');
     }
     const plddt = plddtDB.data(plddtKey.value).toString('ascii');
 

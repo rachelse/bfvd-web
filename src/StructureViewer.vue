@@ -512,7 +512,9 @@ END
         },
         'second': {
             handler() {
-                if (this.second == "") {
+                // Guard falsy, not just "": an undefined here used to be interpolated
+                // into the URL and fetched as the literal string "undefined".
+                if (!this.second) {
                     return;
                 }
                 this.$nextTick(async () => {
