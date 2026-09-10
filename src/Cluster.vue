@@ -104,7 +104,7 @@
                     Singleton cluster
                 </dt>
                 <dd>
-                    {{ response.is_dark ? 'yes' : 'no' }}
+                    {{ response.is_singleton ? 'yes' : 'no' }}
                 </dd>
                 </div>
                 <div style=" grid-area: 2 / 1 / 3 / 5;">

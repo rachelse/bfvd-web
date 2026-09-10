@@ -56,28 +56,28 @@
                     <TaxSpan :taxonomy="prop.value"></TaxSpan>
                 </template>
     
-                <template v-slot:header.is_dark="{ column }">
+                <template v-slot:header.is_singleton="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
                         <template v-slot:activator="{ props }">
-                            <v-btn v-bind="props" :variant="options.is_dark != null ? 'outlined' : 'plain'">
+                            <v-btn v-bind="props" :variant="options.is_singleton != null ? 'outlined' : 'plain'">
                                 {{ column.title }}
                             </v-btn>
                         </template>
     
                         <v-card style="padding: 2em; width: 250px;">
                             <h3>Filter by</h3>
-                            <v-chip-group column v-model="options.is_dark">
-                                <IsDark isDark="0"></IsDark>
-                                <IsDark isDark="1"></IsDark>
+                            <v-chip-group column v-model="options.is_singleton">
+                                <IsSingleton isSingleton="0"></IsSingleton>
+                                <IsSingleton isSingleton="1"></IsSingleton>
                             </v-chip-group>
                         </v-card>
                     </v-menu>
                 </template>
     
-                <template v-slot:item.is_dark="prop">
-                    <IsDark :isDark="prop.value"></IsDark>
+                <template v-slot:item.is_singleton="prop">
+                    <IsSingleton :isSingleton="prop.value"></IsSingleton>
                 </template>
     
                 <template v-slot:header.avg_len="{ column }">
@@ -155,7 +155,7 @@
     import Panel from "./Panel.vue";
     import TaxSpan from "./TaxSpan.vue";
     import TaxonomyAutocomplete from "./TaxonomyAutocomplete.vue";
-    import IsDark from './IsDark.vue';
+    import IsSingleton from './IsSingleton.vue';
     import RangeSlider from './RangeSlider.vue';
     import ExternalLinks from "./ExternalLinks.vue";
     import ImageMixin from "./ImageMixin";
@@ -166,7 +166,7 @@
             Panel,
             TaxSpan,
             TaxonomyAutocomplete,
-            IsDark,
+            IsSingleton,
             RangeSlider,
             ExternalLinks
         },
@@ -214,7 +214,7 @@
                     },
                     {
                         title: "Singleton",
-                        value: "is_dark",
+                        value: "is_singleton",
                         sortable: false,
                     },
                     {
@@ -237,7 +237,7 @@
                     rep_plddt_range: [0, Infinity],
                     n_mem_range: [0, Infinity],
                     tax_id: null,
-                    is_dark: null,
+                    is_singleton: null,
                 },
                 taxAutocompleteDisabled: false,
                 range: [5, 5],
@@ -271,8 +271,8 @@
                 } else {
                     delete copy.tax_id;
                 }
-                if (copy.is_dark == null) {
-                    delete copy.is_dark;
+                if (copy.is_singleton == null) {
+                    delete copy.is_singleton;
                 }
                 const params = new URLSearchParams(copy);
                 params.sort();

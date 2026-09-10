@@ -161,7 +161,7 @@ app.get('/api/search/go/:taxonomy?', async (req, res) => {
     const go_search_type = req.query.go_search_type;
     const goid = req.query.query_GO;
 
-    const is_dark = req.query.is_dark;
+    const is_singleton = req.query.is_singleton;
     let filter_params = [];
     for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
         if (typeof(req.query[i]) == "undefined") {
@@ -185,9 +185,9 @@ app.get('/api/search/go/:taxonomy?', async (req, res) => {
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
     queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
     queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark)
+    if (is_singleton != undefined) {
+        queries_where.push(`c.is_singleton == ?`);
+        filter_params.push(is_singleton)
     }
 
     const query_where = queries_where.slice(1, queries_where.length).join(" AND ");
@@ -226,7 +226,7 @@ app.get('/api/search/lca/:taxonomy?', async (req, res) => {
     const taxid = req.query.taxid;
     const lca_search_type = req.query.type;
 
-    const is_dark = req.query.is_dark;
+    const is_singleton = req.query.is_singleton;
     let filter_params = [];
     for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
         if (typeof(req.query[i]) == "undefined") {
@@ -250,9 +250,9 @@ app.get('/api/search/lca/:taxonomy?', async (req, res) => {
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
     queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
     queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark)
+    if (is_singleton != undefined) {
+        queries_where.push(`c.is_singleton == ?`);
+        filter_params.push(is_singleton)
     }
 
     let result = await sql.all(`
@@ -311,7 +311,7 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
         fileCache.add(jobid, JSON.stringify(results));
     }
 
-    const is_dark = req.query.is_dark;
+    const is_singleton = req.query.is_singleton;
     let filter_params = [];
     for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
         if (typeof(req.query[i]) == "undefined") {
@@ -330,9 +330,9 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
     queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
     queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark ? '1' : '0')
+    if (is_singleton != undefined) {
+        queries_where.push(`c.is_singleton == ?`);
+        filter_params.push(is_singleton ? '1' : '0')
     }
 
     const accessions = results.map(r => r.accession);

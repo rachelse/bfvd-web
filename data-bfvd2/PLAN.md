@@ -205,9 +205,9 @@ scratch. `mkdb.awk` needs a "grouped but unsorted" mode for it.
 
 ---
 
-## 5. Code changes (not started — data first)
+## 5. Code changes
 
-**5.1 `is_dark` → `is_singleton`** — 8 files: `IsDark.vue` → `IsSingleton.vue` (+ prop
+**5.1 `is_dark` → `is_singleton` — done.** 8 files: `IsDark.vue` → `IsSingleton.vue` (+ prop
 `isDark`), `LCASearchResult.vue` (11 refs), `FoldseekSearchResult.vue` (11),
 `Cluster.vue:107`, `Similars.vue:152`, `index.mjs` (LCA + Foldseek endpoints),
 `schema.sql`. `GoSearchResult.vue` is deleted anyway. Changes the query param
@@ -264,7 +264,8 @@ script: it cannot run until the entry-centric server changes land. See §7.
 | 8. `ncbitaxonomy.json` | 1 min | **done** — 223 MB |
 | 9. `validate.sh` | 3 min | **done** — **ALL CHECKS PASSED** (§6) |
 | 10. `ava_db` | — | blocked: file still copying (§8) |
-| 11. Code: `is_singleton` rename, GO removal (§5.1–5.2) | — | not started; pure refactors, independent of the data |
+| 11a. Code: `is_singleton` rename + `flag` (§5.1) | — | **done** — frontend builds clean, no `is_dark` left in `src/` |
+| 11b. Code: remove GO (§5.2) | — | not started |
 | 12. Code: entry-centric server + entry page (§5.3–5.4) | — | not started; **the server cannot read this DB until it lands** |
 | 13. Swap `out/` → `data/` | — | **yours** (§3.16) |
 

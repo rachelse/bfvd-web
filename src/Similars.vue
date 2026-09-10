@@ -149,7 +149,7 @@ export default {
                 },
                 {
                     title: "Singleton cluster",
-                    value: "is_dark",
+                    value: "is_singleton",
                     sortable: true,
                 },
                 {
