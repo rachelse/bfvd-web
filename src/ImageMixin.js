@@ -18,6 +18,9 @@ export default {
             }
             this.images = [];
             for (let i = 0; i < accessions.length; i++) {
+                if (!accessions[i]) {
+                    continue;
+                }
                 this.$axios.get("/structure/" + accessions[i])
                     .then((response) => {
                         this.$molstarService.makeImage(response.data.seq, response.data.plddt, response.data.coordinates)

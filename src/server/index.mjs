@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 
 import DbReader from './dbreader.mjs';
 import read from './compressed_ca.mjs';
-import { serializeTree, unserializeTree, idx_to_rank } from './ncbitaxonomy.mjs';
+import { serializeTree, unserializeTree, idx_to_rank, rank_to_idx } from './ncbitaxonomy.mjs';
 import FileCache from './filecache.mjs';
 import { convertToQueryUrl } from './utils.mjs';
 
@@ -49,8 +49,15 @@ checkpoints.push(plddtDB.make(dataPath + '/afdb_plddt', dataPath + '/afdb_plddt.
 const descDB = new DbReader();
 checkpoints.push(descDB.make(dataPath + '/afdb_desc', dataPath + '/afdb_desc.index'));
 
-const avaDb = new DbReader();
-checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
+// Optional, like warning_db below: the v2 all-vs-all is not built yet, and the server
+// is useful without it -- "Similar entries" simply comes back empty.
+let avaDb = null;
+if (existsSync(dataPath + '/ava_db')) {
+    avaDb = new DbReader();
+    checkpoints.push(avaDb.make(dataPath + '/ava_db', dataPath + '/ava_db.index'));
+} else {
+    console.log('No ava_db found; "Similar entries" will be empty.');
+}
 
 let warnDB = null;
 if (existsSync(dataPath + '/warning_db')) {
@@ -69,6 +76,16 @@ function getDescription(accession) {
         return descDB.data(descId.value).toString('utf8');
     }
 }
+
+// BFVD v2 is entry-centric: every entry has its own structure and its own page, and
+// `cluster` only groups entries by sequence clustering (30% id / 90% cov) to drive the
+// members panel. Nothing is a "representative" any more, so the rep_* names are gone
+// from the API as well as the schema.
+const ENTRY_COLS = `
+    e.accession, e.len, e.plddt, e.tax_id, e.flag, e.cluster_id,
+    c.n_mem, c.avg_len, c.avg_plddt, c.is_singleton, c.lca_tax_id`;
+
+const ENTRY_FROM = `FROM entry AS e JOIN cluster AS c ON e.cluster_id = c.cluster_id`;
 
 const app = express();
 app.use(cors());
@@ -145,7 +162,7 @@ function finalizeResult(result, req, res) {
         result = result.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
     }
     result.forEach((x) => {
-        x.description = getDescription(x.rep_accession);
+        x.description = getDescription(x.accession);
         if (!is_tax_filter) {
             if (x.lca_tax_id) {
                 x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
@@ -157,78 +174,14 @@ function finalizeResult(result, req, res) {
     return;
 }
 
-app.get('/api/search/go/:taxonomy?', async (req, res) => {
-    const go_search_type = req.query.go_search_type;
-    const goid = req.query.query_GO;
-
-    const is_dark = req.query.is_dark;
-    let filter_params = [];
-    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
-        if (typeof(req.query[i]) == "undefined") {
-            filter_params.push('0');
-            filter_params.push('INF');
-        } else {
-            const split = req.query[i].split(',');
-            filter_params.push(split[0] ?? '0');
-            filter_params.push(split[1] ?? 'INF');
-        }
-    }
-
-    let queries_where = [];
-    if (go_search_type === 'exact') {
-        queries_where.push("go.goid = ?")
-    } else {
-        queries_where.push("go.goid in (SELECT child FROM go_child as gc WHERE gc.parent = ?)");
-    }
-    queries_where.push(`c.avg_len >= ? AND c.avg_len <= ?`);
-    queries_where.push(`c.avg_plddt >= ? AND c.avg_plddt <= ?`);
-    queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
-    queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark)
-    }
-
-    const query_where = queries_where.slice(1, queries_where.length).join(" AND ");
-    let result = await sql.all(`
-        SELECT DISTINCT *
-            FROM cluster as c
-            WHERE c.rep_accession in (
-                SELECT rep_accession
-                    FROM cluster_go as go
-                    WHERE ${queries_where[0]}
-                ) AND ${query_where}
-            `, goid, ...filter_params);
-
-    return finalizeResult(result, req, res);
-});
-
-function sanitizeFTS(input) {
-    return input.replace(/[^a-z0-9]/gi, ' ').trim();
-}
-
-app.get('/api/autocomplete/go/:substring', async (req, res) => {
-    let substring = req.params.substring;
-    const isGoTerm = /^GO:\d+$/.test(substring);
-    if (!isGoTerm) {
-        substring = sanitizeFTS(substring);
-    }
-    let result = await sql.all(`
-        SELECT go_id, go_name
-        FROM go_terms
-        ${isGoTerm ? 'WHERE go_id = ?' : 'WHERE go_name MATCH ? ORDER BY rank'};
-    `, substring);
-    res.send({ result });
-});
 
 app.get('/api/search/lca/:taxonomy?', async (req, res) => {
     const taxid = req.query.taxid;
     const lca_search_type = req.query.type;
 
-    const is_dark = req.query.is_dark;
+    const is_singleton = req.query.is_singleton;
     let filter_params = [];
-    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
+    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'length_range', 'plddt_range']) {
         if (typeof(req.query[i]) == "undefined") {
             filter_params.push('0');
             filter_params.push('INF');
@@ -248,16 +201,16 @@ app.get('/api/search/lca/:taxonomy?', async (req, res) => {
     queries_where.push(`c.avg_len >= ? AND c.avg_len <= ?`);
     queries_where.push(`c.avg_plddt >= ? AND c.avg_plddt <= ?`);
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
-    queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark)
+    queries_where.push(`e.len >= ? AND e.len <= ?`);
+    queries_where.push(`e.plddt >= ? AND e.plddt <= ?`);
+    if (is_singleton != undefined) {
+        queries_where.push(`c.is_singleton == ?`);
+        filter_params.push(is_singleton)
     }
 
     let result = await sql.all(`
-    SELECT DISTINCT * 
-        FROM cluster as c 
+    SELECT DISTINCT ${ENTRY_COLS}
+        ${ENTRY_FROM}
         WHERE ${queries_where.join(" AND ")}
     `, taxid, ...filter_params);
 
@@ -311,9 +264,9 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
         fileCache.add(jobid, JSON.stringify(results));
     }
 
-    const is_dark = req.query.is_dark;
+    const is_singleton = req.query.is_singleton;
     let filter_params = [];
-    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'rep_length_range', 'rep_plddt_range']) {
+    for (let i of ['avg_length_range', 'avg_plddt_range', 'n_mem_range', 'length_range', 'plddt_range']) {
         if (typeof(req.query[i]) == "undefined") {
             filter_params.push('0');
             filter_params.push('INF');
@@ -328,29 +281,26 @@ app.get('/api/search/foldseek/:taxonomy?', async (req, res) => {
     queries_where.push(`c.avg_len >= ? AND c.avg_len <= ?`);
     queries_where.push(`c.avg_plddt >= ? AND c.avg_plddt <= ?`);
     queries_where.push(`c.n_mem >= ? AND c.n_mem <= ?`);
-    queries_where.push(`c.rep_len >= ? AND c.rep_len <= ?`);
-    queries_where.push(`c.rep_plddt >= ? AND c.rep_plddt <= ?`);
-    if (is_dark != undefined) {
-        queries_where.push(`c.is_dark == ?`);
-        filter_params.push(is_dark ? '1' : '0')
+    queries_where.push(`e.len >= ? AND e.len <= ?`);
+    queries_where.push(`e.plddt >= ? AND e.plddt <= ?`);
+    if (is_singleton != undefined) {
+        queries_where.push(`c.is_singleton == ?`);
+        filter_params.push(is_singleton ? '1' : '0')
     }
 
     const accessions = results.map(r => r.accession);
     let result = await sql.all(`
-        SELECT DISTINCT *
-            FROM cluster as c
-            WHERE c.rep_accession in (
-                SELECT DISTINCT rep_accession
-                FROM member
-                WHERE accession IN (${accessions.map(() => '?').join(',')})
-            ) AND ${queries_where.join(" AND ")}
+        SELECT DISTINCT ${ENTRY_COLS}
+            ${ENTRY_FROM}
+            WHERE e.accession IN (${accessions.map(() => '?').join(',')})
+              AND ${queries_where.join(" AND ")}
             `, ...accessions, ...filter_params);
 
     return finalizeResult(result, req, res);
 });
 
 app.get('/api/:query', async (req, res) => {
-    let result = await sql.get("SELECT * FROM member as m LEFT JOIN cluster as c ON m.rep_accession == c.rep_accession WHERE m.accession = ?", req.params.query);
+    let result = await sql.get(`SELECT ${ENTRY_COLS} ${ENTRY_FROM} WHERE e.accession = ?`, req.params.query);
     if (!result || result.lca_tax_id == null) {
         res.status(404).send({ error: "No cluster found" });
         return;
@@ -361,11 +311,6 @@ app.get('/api/:query', async (req, res) => {
 
 app.get('/api/cluster/:cluster/annotations', async (req, res) => {
     const cluster = req.params.cluster;
-    // let result = await sql.all(`
-    // SELECT tax_id
-    //     FROM member
-    //     WHERE rep_accession == ?;
-    // `, cluster);
 
     function color_designation(high_color, low_color, annotations) {
         let highest_hit = 0;
@@ -413,7 +358,14 @@ app.get('/api/cluster/:cluster/annotations', async (req, res) => {
 function makeSankey(result) {
     let nodes = {};
     let links = {};
-    const allowedRanks = [28, 27, 24, 12, 8, 4];
+    // Was the magic list [28, 27, 24, 12, 8, 4]. Name the ranks instead, so this cannot
+    // drift out of step with rank_to_idx, and include the ranks NCBI now uses at the top
+    // of the viral tree: Viruses is an "acellular root", not a "superkingdom", which is
+    // why it was missing from the diagram entirely.
+    const allowedRanks = ['acellular root', 'superkingdom', 'realm', 'kingdom',
+                          'phylum', 'family', 'genus', 'species']
+        .map((r) => rank_to_idx[r])
+        .filter((r) => r !== undefined);
     result.forEach((x) => {
         if (tree.nodeExists(x.tax_id) == false) {
             return;
@@ -480,14 +432,18 @@ app.get('/api/cluster/:cluster/sankey-members', async (req, res) => {
     const cluster = req.params.cluster;
     let result = await sql.all(`
     SELECT tax_id
-        FROM member
-        WHERE rep_accession == ?;
+        FROM entry
+        WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?);
     `, cluster);
     res.send({result: makeSankey(result)});
 });
 
 app.get('/api/cluster/:cluster/sankey-similars', async (req, res) => {
     const cluster = req.params.cluster;
+    if (avaDb == null) {
+        res.send([]);
+        return;
+    }
     const avaKey = avaDb.id(cluster);
     if (avaKey.found == false) {
         res.send([]);
@@ -498,15 +454,15 @@ app.get('/api/cluster/:cluster/sankey-similars', async (req, res) => {
     ids_evalue.splice(-1);
     const accessions = ids_evalue.map((x) => x[0]).filter((x) => x != cluster);
     let result = await sql.all(`
-    SELECT DISTINCT lca_tax_id as tax_id
-        FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+    SELECT DISTINCT tax_id
+        FROM entry
+        WHERE accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     res.send({result: makeSankey(result)});
 });
 
 app.get('/api/cluster/:cluster', async (req, res) => {
-    let result = await sql.get("SELECT * FROM cluster as c LEFT JOIN member as m ON c.rep_accession == m.accession WHERE c.rep_accession = ?", req.params.cluster);
+    let result = await sql.get(`SELECT ${ENTRY_COLS} ${ENTRY_FROM} WHERE e.accession = ?`, req.params.cluster);
     if (!result) {
         res.status(404).send({ error: "No cluster found" });
         return;
@@ -519,17 +475,42 @@ app.get('/api/cluster/:cluster', async (req, res) => {
     }
     result.tax_id = tree.nodeExists(result.tax_id) ? tree.getNode(result.tax_id) : null;
     if (result.tax_id != null) {
-        result.rep_lineage = tree.nodeExists(result.tax_id.id) ? tree.lineage(result.tax_id) : null;
+        result.lineage_entry = tree.nodeExists(result.tax_id.id) ? tree.lineage(result.tax_id) : null;
     } else {
-        result.rep_lineage = [{ id: 0, rank: "unknown", name: "unknown" }];
+        result.lineage_entry = [{ id: 0, rank: "unknown", name: "unknown" }];
     }
-    result.description = getDescription(result.rep_accession);
+    result.description = getDescription(result.accession);
     if (warnDB) {
-        const warnKey = warnDB.id(result.rep_accession);
+        const warnKey = warnDB.id(result.accession);
         result.warning = warnKey.found;
     } else {
         result.warning = false;
     }
+    // Species comes off the NCBI tree rather than a stored ICTV name: resolved to its
+    // species-rank ancestor, the NCBI scientific name equals the ICTV species for
+    // 176,302 of 176,330 mapped taxids, so storing both would only add a way to disagree.
+    result.species = null;
+    if (result.lineage_entry) {
+        const species = result.lineage_entry.find((x) => x.rank === "species");
+        if (species) {
+            result.species = species;
+        }
+    }
+
+    // ICTV identity for outbound links. Absent values are the literal 'NA' rather than
+    // NULL, so normalize them away before they reach the UI.
+    const ictv = await sql.get("SELECT ictv_id, ictv_accession, ictv_host, mapping_step FROM ictv WHERE tax_id = ?", String(result.tax_id ? result.tax_id.id : ''));
+    const notNA = (v) => (v && v !== 'NA') ? v : null;
+    result.ictv = ictv ? {
+        id: notNA(ictv.ictv_id),
+        accessions: notNA(ictv.ictv_accession) ? ictv.ictv_accession.split(';') : [],
+        host_category: notNA(ictv.ictv_host),
+        mapping_step: notNA(ictv.mapping_step),
+    } : { id: null, accessions: [], host_category: null, mapping_step: null };
+
+    // UniProt gives a specific host organism with a taxid; ICTV only a coarse category.
+    // They are different granularities, so they are never merged -- prefer UniProt, fall
+    // back to the ICTV category, and let the UI say "NA" when neither exists.
     let hosts = await sql.all("SELECT tax_id FROM taxonomy_host WHERE accession = ?", req.params.cluster);
     result.hosts = [];
     if (hosts) {
@@ -540,6 +521,9 @@ app.get('/api/cluster/:cluster', async (req, res) => {
             }
         }
     }
+    result.host_source = result.hosts.length > 0
+        ? 'uniprot'
+        : (result.ictv.host_category ? 'ictv' : null);
 
     res.send(result);
 });
@@ -569,8 +553,8 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
     if (req.query.tax_id) {
         result = await sql.all(`
         SELECT accession, tax_id, flag
-            FROM member
-            WHERE rep_accession = ? ${flagFilter}
+            FROM entry
+            WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?) ${flagFilter}
             ORDER BY rowid;
         `, ...args);
         
@@ -599,7 +583,7 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
     } else {
         let paginate_query = "";
         if (paginate) {
-            total = await sql.get(`SELECT COUNT(accession) as total FROM member WHERE rep_accession = ? ${flagFilter}`, ...args);
+            total = await sql.get(`SELECT COUNT(accession) as total FROM entry WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?) ${flagFilter}`, ...args);
             total = total.total;
             args.push((req.query.itemsPerPage) | 0);
             args.push(((req.query.page - 1) * req.query.itemsPerPage) | 0);
@@ -607,8 +591,8 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
         }
         result = await sql.all(`
         SELECT accession, tax_id, flag
-            FROM member
-            WHERE rep_accession = ? ${flagFilter}
+            FROM entry
+            WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?) ${flagFilter}
             ORDER BY rowid
             ${paginate_query};
         `, ...args);
@@ -656,8 +640,8 @@ app.get('/api/cluster/:cluster/members', async (req, res) => {
 app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
     let result = await sql.all(`
         SELECT tax_id
-            FROM member
-            WHERE rep_accession = ?;
+            FROM entry
+            WHERE cluster_id = (SELECT cluster_id FROM entry WHERE accession = ?);
         `, req.params.cluster); 
     let suggestions = {};
     let count = 0;
@@ -683,6 +667,10 @@ app.get('/api/cluster/:cluster/members/taxonomy/:suggest', async (req, res) => {
 
 app.get('/api/cluster/:cluster/similars', async (req, res) => {
     const cluster = req.params.cluster;
+    if (avaDb == null) {
+        res.send([]);
+        return;
+    }
     const avaKey = avaDb.id(cluster);
     if (avaKey.found == false) {
         res.send([]);
@@ -695,11 +683,11 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
     const accessions = ids_evalue.map((x) => x[0]);
     let result = await sql.all(`
     SELECT *
-        FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+        ${ENTRY_FROM}
+        WHERE e.accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     result.forEach((x) => {
-        x.evalue = map.get(x.rep_accession);
+        x.evalue = map.get(x.accession);
         x.lca_tax_id = tree.nodeExists(x.lca_tax_id) ? tree.getNode(x.lca_tax_id) : null;
     });
     // console.log(result)
@@ -746,14 +734,14 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
                 return 0;
             }
         })
-        sorted = sorted.filter((x) => x.rep_accession != cluster);
+        sorted = sorted.filter((x) => x.accession != cluster);
         const total = sorted.length;
         sorted = sorted.slice((req.query.page - 1) * req.query.itemsPerPage, req.query.page * req.query.itemsPerPage);
-        sorted.forEach((x) => { x.description = getDescription(x.rep_accession) });
+        sorted.forEach((x) => { x.description = getDescription(x.accession) });
         res.send({ total: total, similars: sorted });
         return;
     } else {
-        result.forEach((x) => { x.description = getDescription(x.rep_accession) });
+        result.forEach((x) => { x.description = getDescription(x.accession) });
     }
 
     const safeCluster = req.params.cluster.replace(/[^a-zA-Z0-9]/g, '');
@@ -763,7 +751,7 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
             res.setHeader('Content-Type', 'text/plain');
             res.charset = 'UTF-8';
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => similar.rep_accession).join('\n'),
+                chunk => chunk.map(similar => similar.accession).join('\n'),
                 chunk => res.write(chunk));
             res.end();
             break;
@@ -774,7 +762,7 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
             res.charset = 'UTF-8';
 
             processAndWriteInChunks(result, 10000,
-                chunk => chunk.map(similar => `>${similar.rep_accession} ${similar.description.trimEnd()} OX=${similar.lca_tax_id ? similar.lca_tax_id.id : '0'} OS=${similar.lca_tax_id ? similar.lca_tax_id.name : 'unknown'} Eval=${similar.evalue}\n${aaDb.data(aaDb.id(similar.rep_accession).value).toString('ascii')}`).join(''),
+                chunk => chunk.map(similar => `>${similar.accession} ${similar.description.trimEnd()} OX=${similar.lca_tax_id ? similar.lca_tax_id.id : '0'} OS=${similar.lca_tax_id ? similar.lca_tax_id.name : 'unknown'} Eval=${similar.evalue}\n${aaDb.data(aaDb.id(similar.accession).value).toString('ascii')}`).join(''),
                 chunk => res.write(chunk));
 
             res.end();
@@ -788,6 +776,10 @@ app.get('/api/cluster/:cluster/similars', async (req, res) => {
 
 app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => {
     const cluster = req.params.cluster;
+    if (avaDb == null) {
+        res.send([]);
+        return;
+    }
     const avaKey = avaDb.id(cluster);
     if (avaKey.found == false) {
         res.send([]);
@@ -799,8 +791,8 @@ app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => 
     const accessions = ids_evalue.map((x) => x[0]);
     let result = await sql.all(`
     SELECT *
-        FROM cluster
-        WHERE rep_accession IN (${accessions.map(() => "?").join(",")});
+        ${ENTRY_FROM}
+        WHERE e.accession IN (${accessions.map(() => "?").join(",")});
     `, accessions);
     let suggestions = {};
     let count = 0;
@@ -826,20 +818,30 @@ app.get('/api/cluster/:cluster/similars/taxonomy/:suggest', async (req, res) => 
 
 app.get('/api/structure/:structure', async (req, res) => {
     const structure = req.params.structure;
+
+    // An unknown accession is a client asking for something that does not exist, not a
+    // server fault: answer 404 rather than throwing a 500 with a stack trace. A stale
+    // frontend sending the literal string "undefined" used to log one per request.
+    const notFound = (db) => {
+        res.status(404);
+        res.removeHeader('Cache-Control');
+        res.send({ error: `${structure} not found in ${db}` });
+    };
+
     const aaKey = aaDb.id(structure);
     if (aaKey.found == false) {
-        throw Error(`${structure} not found in aa db`);
+        return notFound('the sequence database');
     }
     const aaLength = aaDb.length(aaKey.value) - 2;
 
     const key = caDb.id(structure);
     if (key.found == false) {
-        throw Error(`${structure} not found in ca db`);
+        return notFound('the coordinate database');
     }
 
     const plddtKey = plddtDB.id(structure);
     if (plddtKey.found == false) {
-        throw Error(`${structure} not found in plddt db`);
+        return notFound('the pLDDT database');
     }
     const plddt = plddtDB.data(plddtKey.value).toString('ascii');
 

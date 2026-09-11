@@ -53,7 +53,6 @@ const router = createRouter({
     routes: [
         { path: '/', redirect: { name: 'search' } },
         { name: 'search', path: '/', component: Search },
-        { name: 'go', path: '/go/:go/:type', component: Search },
         { name: 'lca', path: '/lca/:taxid/:type', component: Search },
         { name: 'foldseek', path: '/foldseek/:jobid', component: Search },
         { name: 'cluster', path: '/cluster/:cluster', component: Cluster },
@@ -82,6 +81,13 @@ const vuetify = createVuetify({
     },
     theme: {
         defaultTheme: mq.matches ? 'dark' : 'light',
+        // Vuetify 3 shifted the default light primary from #1976D2 to #1867C0. Links are
+        // themed off primary (see the anchor rule in App.vue), so pin the v2 values to
+        // keep the palette identical to the previous BFVD site. Dark was already #2196F3.
+        themes: {
+            light: { colors: { primary: '#1976D2' } },
+            dark:  { colors: { primary: '#2196F3' } },
+        },
     },
 })
 

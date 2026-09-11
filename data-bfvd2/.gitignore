@@ -1,0 +1,9 @@
+# Only the build scripts and PLAN.md are tracked. Everything the build produces or
+# downloads stays local: out/ is ~15 GB, tmp/ and taxdump/ are intermediates, and the
+# all-vs-all input is 464 GB.
+out/
+tmp/
+log/
+taxdump/
+*.tsv
+*.tar.gz

@@ -53,12 +53,38 @@ const rank_to_idx = {
     "subsection": 41,
     "cohort" : 42,
     "series": 43,
+    // NCBI reclassified the top of the tree: Viruses (10239) is no longer a
+    // "superkingdom" but an "acellular root", and the viral hierarchy gained "realm".
+    // A rank missing from this table becomes undefined on the node, which silently drops
+    // it from anything rank-aware -- notably the Sankey, where it made Viruses vanish.
+    // Appended rather than inserted so the existing indices keep their values.
+    "acellular root": 44,
+    "cellular root": 45,
+    "realm": 46,
+    "domain": 47,
+    "subvariety": 48,
 }
 
 // renumber ranks to be consecutive
 
 
 const idx_to_rank = Array.from(Object.keys(rank_to_idx));
+
+const unknownRanks = new Set();
+
+// An unrecognised rank used to become `undefined`, which then disappeared from every
+// rank-aware code path without a word. Fall back to "no rank" and say so once.
+function rankIndex(rank) {
+    if (rank in rank_to_idx) {
+        return rank_to_idx[rank];
+    }
+    if (!unknownRanks.has(rank)) {
+        unknownRanks.add(rank);
+        console.warn(`ncbitaxonomy: unknown rank "${rank}", treating as "no rank". `
+                     + `Add it to rank_to_idx if it should be selectable.`);
+    }
+    return rank_to_idx["no rank"];
+}
 
 function bcpLineSplit(lineContent) {
     return lineContent.slice(0, -2).split('\t|\t');
@@ -89,6 +115,10 @@ function unserializeTree(jsonIn) {
 function openFolderSources(pathDir) {
     return new Promise((resolve, reject) => {
         readdir(pathDir, (err, files) => {
+            if (err) {
+                reject(new Error(`Cannot read DATA_PATH directory ${pathDir}: ${err.message}`));
+                return;
+            }
             let data = {};
             files.forEach(file => {
                 if (file === 'names.dmp')
@@ -98,8 +128,17 @@ function openFolderSources(pathDir) {
                 if (file === 'merged.dmp')
                     data['mergedNodes'] = createReadStream(`${pathDir}/${file}`);
             });
-            if (!("nodeNames" in data) || !("topology" in data))
-                reject('Mssing');
+            if (!("nodeNames" in data) || !("topology" in data)) {
+                const missing = [
+                    !("nodeNames" in data) ? 'names.dmp' : null,
+                    !("topology" in data) ? 'nodes.dmp' : null,
+                ].filter(Boolean).join(', ');
+                reject(new Error(
+                    `Cannot build the taxonomy: ${pathDir} has no ncbitaxonomy.json and is `
+                    + `missing ${missing}. Point DATA_PATH at the directory holding the `
+                    + `dataset, or put the NCBI taxdump files there so it can be built.`));
+                return;
+            }
             resolve(data);
         });
     });
@@ -201,7 +240,7 @@ class Tree {
                 this.nodePool[id] = {
                     i: id,
                     p: Number(arr[1]),
-                    r: rank_to_idx[arr[2]]
+                    r: rankIndex(arr[2])
                 };
                 n += 1;
             });

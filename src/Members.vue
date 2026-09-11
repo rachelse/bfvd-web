@@ -1,7 +1,18 @@
 <template>
 <Panel style="margin-top: 1em;" collapsible>
     <template v-slot:header>
-        UniRef members
+        Cluster members
+        <v-tooltip top>
+            <template v-slot:activator="{ props }">
+                <span v-bind="props">
+                    <v-icon size="small" v-bind="props">{{ $MDI.HelpCircleOutline }}</v-icon>
+                </span>
+            </template>
+            <span>
+                Other BFVD entries in the same sequence cluster
+                (MMseqs2, 30% identity, 90% coverage)
+            </span>
+        </v-tooltip>
     </template>
 
     <template v-slot:toolbar-extra>
@@ -28,31 +39,29 @@
 <template v-slot:content>
     <template v-if="$route.params.cluster">
     <Sankey :cluster="cluster" type="members" @select="sankeySelect"></Sankey>
-    <v-data-table
+    <v-data-table-server
         :headers="headers"
         :items="members"
         v-model:page="options.page"
         v-model:items-per-page="options.itemsPerPage"
-        :server-items-length="totalMembers"
+        :items-length="totalMembers"
         :loading="loading"
-        :footer-props="{
-            'items-per-page-options': [10, 20, 50, 100, -1],
-        }"
+        :items-per-page-options="[10, 20, 50, 100]"
     >
         <template v-slot:item.accession="prop">
             <ExternalLinks :accession="prop.value"></ExternalLinks><br>
             {{ prop.item.description }}
         </template>
-        <!-- <template v-slot:header.structure="{ column }">
-            {{ header.text }}
+        <template v-slot:header.structure="{ column }">
+            {{ column.title }}
             <v-tooltip top>
-                <template v-slot:activator="{ on }">
-                    <span v-on="on">
-                        <v-icon v-on="on">{{ $MDI.HelpCircleOutline }}</v-icon>
+                <template v-slot:activator="{ props }">
+                    <span v-bind="props">
+                        <v-icon v-bind="props">{{ $MDI.HelpCircleOutline }}</v-icon>
                     </span>
                 </template>
                 <span>
-                   Click on a structure to superpose it on to the cluster representative in the structure viewer
+                   Click on a structure to superpose it on to this entry in the structure viewer
                 </span>
             </v-tooltip>
         </template>
@@ -60,7 +69,7 @@
             <div v-ripple="{ class: `primary--text` }" style="text-align: center; cursor: pointer;" @click="$emit('select', prop.item.accession)">
                 <img :src="getImage(prop.item.accession)" style="height:75px"/>
             </div>
-        </template> -->
+        </template>
         <!-- <template v-slot:item.flag="prop">
             <Fragment :flag="prop.value"></Fragment>
         </template> -->
@@ -117,7 +126,7 @@
                 <v-img :src="require('./assets/marv-foldseek-small.png')" max-width="16"></v-img>
             </v-chip>
         </template> -->
-    </v-data-table>
+    </v-data-table-server>
     </template>
 </template>
 </Panel>
@@ -149,17 +158,17 @@ export default {
     data() {
         return {
             headers: [
-                // {
-                //     text: "Structure",
-                //     value: "structure",
-                //     sortable: false,
-                //     width: "10%",
-                // },
+                {
+                    title: "Structure",
+                    value: "structure",
+                    sortable: false,
+                    width: "15%",
+                },
                 {
                     title: "Accession",
                     value: "accession",
                     sortable: false,
-                    width: "35%",
+                    width: "30%",
                 },
                 // {
                 //     text: "Length",
@@ -176,7 +185,7 @@ export default {
                     title: "Taxonomy",
                     value: "tax_id",
                     sortable: false,
-                    width: "40%",
+                    width: "35%",
                 },
                 // {
                 //     text: 'Actions',
@@ -249,7 +258,7 @@ export default {
                 .then(response => {
                     this.members = response.data.result;
                     this.totalMembers = response.data.total;
-                    // this.fetchImages(this.members.map(m => m.accession));
+                    this.fetchImages(this.members.map(m => m.accession));
                 })
                 .catch(() => {})
                 .finally(() => {

@@ -21,13 +21,13 @@
             >
                 <template v-slot:item.structure="prop">
                     <div style="text-align: center;">
-                        <router-link :to="{ name: 'cluster', params: { cluster: prop.item.rep_accession }}" target='_blank'>
-                            <img :src="getImage(prop.item.rep_accession)" style="height:75px"/>
+                        <router-link :to="{ name: 'cluster', params: { cluster: prop.item.accession }}" target='_blank'>
+                            <img :src="getImage(prop.item.accession)" style="height:75px"/>
                         </router-link>
                     </div>
                 </template>
     
-                <template v-slot:item.rep_accession="prop">
+                <template v-slot:item.accession="prop">
                     <ExternalLinks :accession="prop.value">
                         <template v-slot:accession><router-link :to="{ name: 'cluster', params: { cluster: prop.value }}" target="_blank">{{ prop.value }}</router-link></template>
                     </ExternalLinks><br>
@@ -39,7 +39,7 @@
                 </template>
     
     
-                <template v-slot:item.rep_plddt="prop">
+                <template v-slot:item.plddt="prop">
                     {{ prop.value.toFixed(2) }}
                 </template>
     
@@ -56,28 +56,28 @@
                     <TaxSpan :taxonomy="prop.value"></TaxSpan>
                 </template>
     
-                <template v-slot:header.is_dark="{ column }">
+                <template v-slot:header.is_singleton="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
                         <template v-slot:activator="{ props }">
-                            <v-btn v-bind="props" :variant="options.is_dark != null ? 'outlined' : 'plain'">
+                            <v-btn v-bind="props" :variant="options.is_singleton != null ? 'outlined' : 'plain'">
                                 {{ column.title }}
                             </v-btn>
                         </template>
     
                         <v-card style="padding: 2em; width: 250px;">
                             <h3>Filter by</h3>
-                            <v-chip-group column v-model="options.is_dark">
-                                <IsDark isDark="0"></IsDark>
-                                <IsDark isDark="1"></IsDark>
+                            <v-chip-group column v-model="options.is_singleton">
+                                <IsSingleton isSingleton="0"></IsSingleton>
+                                <IsSingleton isSingleton="1"></IsSingleton>
                             </v-chip-group>
                         </v-card>
                     </v-menu>
                 </template>
     
-                <template v-slot:item.is_dark="prop">
-                    <IsDark :isDark="prop.value"></IsDark>
+                <template v-slot:item.is_singleton="prop">
+                    <IsSingleton :isSingleton="prop.value"></IsSingleton>
                 </template>
     
                 <template v-slot:header.avg_len="{ column }">
@@ -119,7 +119,7 @@
                     </v-menu>
                 </template>
     
-                <template v-slot:header.rep_len="{ column }">
+                <template v-slot:header.len="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
@@ -128,11 +128,11 @@
                                 {{ column.title }}
                             </v-btn>
                         </template>
-                        <RangeSlider :range="options.rep_length_range"></RangeSlider>
+                        <RangeSlider :range="options.length_range"></RangeSlider>
                     </v-menu>
                 </template>
     
-                <template v-slot:header.rep_plddt="{ column }">
+                <template v-slot:header.plddt="{ column }">
                     <v-menu
                         :close-on-content-click="false"
                         offset-y>
@@ -141,7 +141,7 @@
                                 {{ column.title }}
                             </v-btn>
                         </template>
-                        <RangeSlider :range="options.rep_plddt_range"></RangeSlider>
+                        <RangeSlider :range="options.plddt_range"></RangeSlider>
                     </v-menu>
                 </template>
     
@@ -155,7 +155,7 @@
     import Panel from "./Panel.vue";
     import TaxSpan from "./TaxSpan.vue";
     import TaxonomyAutocomplete from "./TaxonomyAutocomplete.vue";
-    import IsDark from './IsDark.vue';
+    import IsSingleton from './IsSingleton.vue';
     import RangeSlider from './RangeSlider.vue';
     import ExternalLinks from "./ExternalLinks.vue";
     import ImageMixin from "./ImageMixin";
@@ -166,7 +166,7 @@
             Panel,
             TaxSpan,
             TaxonomyAutocomplete,
-            IsDark,
+            IsSingleton,
             RangeSlider,
             ExternalLinks
         },
@@ -185,7 +185,7 @@
                     },
                     {
                         title: "Accession",
-                        value: "rep_accession",
+                        value: "accession",
                         sortable: false,
                     },
                     // {
@@ -214,17 +214,17 @@
                     },
                     {
                         title: "Singleton",
-                        value: "is_dark",
+                        value: "is_singleton",
                         sortable: false,
                     },
                     {
-                        title: "Rep. pLDDT",
-                        value: "rep_plddt",
+                        title: "pLDDT",
+                        value: "plddt",
                         sortable: false,
                     },
                     {
-                        title: "Rep. length",
-                        value: "rep_len",
+                        title: "Length",
+                        value: "len",
                         sortable: false,
                     },
                 ],
@@ -233,11 +233,11 @@
                     itemsPerPage: 10,
                     avg_length_range: [0, Infinity],
                     avg_plddt_range: [0, Infinity],
-                    rep_length_range: [0, Infinity],
-                    rep_plddt_range: [0, Infinity],
+                    length_range: [0, Infinity],
+                    plddt_range: [0, Infinity],
                     n_mem_range: [0, Infinity],
                     tax_id: null,
-                    is_dark: null,
+                    is_singleton: null,
                 },
                 taxAutocompleteDisabled: false,
                 range: [5, 5],
@@ -271,8 +271,8 @@
                 } else {
                     delete copy.tax_id;
                 }
-                if (copy.is_dark == null) {
-                    delete copy.is_dark;
+                if (copy.is_singleton == null) {
+                    delete copy.is_singleton;
                 }
                 const params = new URLSearchParams(copy);
                 params.sort();
@@ -293,7 +293,7 @@
                     .then(response => {
                         this.response = response.data.result;
                         this.total = response.data.total;
-                        this.fetchImages(this.response.map(m => m.rep_accession));
+                        this.fetchImages(this.response.map(m => m.accession));
                         this.$emit('total', this.total);
                     })
                     .finally(() => {

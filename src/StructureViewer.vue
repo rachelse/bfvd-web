@@ -85,17 +85,17 @@
             </div>
             <div class="structure-viewer" ref="viewport"></div>
         </div>
-        <template v-if="second">
+        <div class="structure-caption" v-if="second">
             <span v-if="secondComponent == null">Superposition loading</span>
             <template v-else>
-                <span style="color:#FFC107">{{ second }}</span> superposed on representative <span style="color:#1E88E5">{{ cluster }}</span>
+                <span style="color:#FFC107">{{ second }}</span> superposed on <span style="color:#1E88E5">{{ cluster }}</span>
                 <template v-if="tmOutput">
                     <br>
                     <span><strong>TM-score:</strong>&nbsp; {{ tmOutput.tmScore.toFixed(2) }}</span>&nbsp;
                     <span><strong>RMSD:</strong>&nbsp; {{ tmOutput.rmsd.toFixed(2) }}&ThinSpace;Å</span>
                 </template>
             </template>
-        </template>
+        </div>
     </div>
 </template>
 
@@ -512,7 +512,9 @@ END
         },
         'second': {
             handler() {
-                if (this.second == "") {
+                // Guard falsy, not just "": an undefined here used to be interpolated
+                // into the URL and fetched as the literal string "undefined".
+                if (!this.second) {
                     return;
                 }
                 this.$nextTick(async () => {
@@ -588,7 +590,7 @@ END
 .structure-wrapper {
     margin: 0 auto;
     position: relative;
-    height: 100%;
+    flex: 1 1 auto;
     min-height: 300px;
     width: 100%;
 }
@@ -609,6 +611,15 @@ END
 .structure-panel {
     position: relative;
     height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.structure-caption {
+    flex: 0 0 auto;
+    margin-top: 0.5em;
+    text-align: center;
+    line-height: 1.4;
 }
 
 .hovered .toolbar-panel {

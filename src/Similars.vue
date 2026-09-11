@@ -24,20 +24,18 @@
     </template>
 
 <template v-slot:content>
-    <v-data-table
+    <v-data-table-server
         v-if="$route.params.cluster"
         :headers="headers"
         :items="entries"
         v-model:page="options.page"
         v-model:items-per-page="options.itemsPerPage"
         v-model:sort-by="options.sortBy"
-        :server-items-length="totalEntries"
+        :items-length="totalEntries"
         :loading="loading"
-        :footer-props="{
-            'items-per-page-options': [10, 20, 50, 100, -1],
-        }"
+        :items-per-page-options="[10, 20, 50, 100]"
     >
-        <template v-slot:item.rep_accession="prop">
+        <template v-slot:item.accession="prop">
             <router-link :to="{ name: 'cluster', params: { cluster: prop.value }}">{{ prop.value }}</router-link><br>
             {{ prop.item.description }}
         </template>
@@ -48,7 +46,7 @@
         <template v-slot:item.avg_plddt="prop">
             {{ prop.value.toFixed(2) }}
         </template>
-        <template v-slot:item.rep_plddt="prop">
+        <template v-slot:item.plddt="prop">
             {{ prop.value.toFixed(2) }}
         </template>
         <template v-slot:header.structure="{ column }">
@@ -60,13 +58,13 @@
                     </span>
                 </template>
                 <span>
-                   Click on a structure to superpose it on to the cluster representative in the structure viewer
+                   Click on a structure to superpose it on to this entry in the structure viewer
                 </span>
             </v-tooltip>
         </template>
         <template v-slot:item.structure="prop">
-            <div v-ripple="{ class: `primary--text` }" style="text-align: center; cursor: pointer;" @click="$emit('select', prop.item.rep_accession)">
-                <img :src="getImage(prop.item.rep_accession)" style="height:75px"/>
+            <div v-ripple="{ class: `primary--text` }" style="text-align: center; cursor: pointer;" @click="$emit('select', prop.item.accession)">
+                <img :src="getImage(prop.item.accession)" style="height:75px"/>
             </div>
         </template>
 
@@ -85,11 +83,11 @@
         </template>
 
         <template v-slot:item.actions="{ item }">
-            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/search?accession=' + item.rep_accession + '&source=BFVD'" target="_blank" rel="noopener">
+            <v-chip title="Search with Foldseek" :href="'https://search.foldseek.com/search?accession=' + item.accession + '&source=BFVD'" target="_blank" rel="noopener">
                 <img src="./assets/marv-foldseek-small.png" style="display: inline-block; width: 16px; height: 16px;" />
             </v-chip>
         </template>
-    </v-data-table>
+    </v-data-table-server>
 </template>
 </Panel>
 </template>
@@ -125,7 +123,7 @@ export default {
                 },
                 {
                     title: "Accession",
-                    value: "rep_accession",
+                    value: "accession",
                     sortable: true,
                 },
                 {
@@ -149,17 +147,17 @@ export default {
                 },
                 {
                     title: "Singleton cluster",
-                    value: "is_dark",
+                    value: "is_singleton",
                     sortable: true,
                 },
                 {
-                    title: "Rep pLDDT",
-                    value: "rep_plddt",
+                    title: "pLDDT",
+                    value: "plddt",
                     sortable: true,
                 },
                 {
-                    title: "Rep length",
-                    value: "rep_len",
+                    title: "Length",
+                    value: "len",
                     sortable: true,
                 },
                 {
@@ -234,9 +232,11 @@ export default {
             }
             this.$axios.get("/cluster/" + cluster + "/similars", this.requestOptions)
                 .then(response => {
-                    this.entries = response.data.similars;
-                    this.totalEntries = response.data.total;
-                    this.fetchImages(this.entries.map(m => m.rep_accession));
+                    // Without an ava_db the endpoint answers a bare [], which has no
+                    // .similars -- default rather than blowing up in .map below.
+                    this.entries = response.data.similars ?? [];
+                    this.totalEntries = response.data.total ?? 0;
+                    this.fetchImages(this.entries.map(m => m.accession));
                 })
                 .catch(() => {})
                 .finally(() => {
