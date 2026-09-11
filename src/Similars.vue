@@ -24,18 +24,16 @@
     </template>
 
 <template v-slot:content>
-    <v-data-table
+    <v-data-table-server
         v-if="$route.params.cluster"
         :headers="headers"
         :items="entries"
         v-model:page="options.page"
         v-model:items-per-page="options.itemsPerPage"
         v-model:sort-by="options.sortBy"
-        :server-items-length="totalEntries"
+        :items-length="totalEntries"
         :loading="loading"
-        :footer-props="{
-            'items-per-page-options': [10, 20, 50, 100, -1],
-        }"
+        :items-per-page-options="[10, 20, 50, 100]"
     >
         <template v-slot:item.accession="prop">
             <router-link :to="{ name: 'cluster', params: { cluster: prop.value }}">{{ prop.value }}</router-link><br>
@@ -89,7 +87,7 @@
                 <img src="./assets/marv-foldseek-small.png" style="display: inline-block; width: 16px; height: 16px;" />
             </v-chip>
         </template>
-    </v-data-table>
+    </v-data-table-server>
 </template>
 </Panel>
 </template>

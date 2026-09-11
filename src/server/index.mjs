@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 
 import DbReader from './dbreader.mjs';
 import read from './compressed_ca.mjs';
-import { serializeTree, unserializeTree, idx_to_rank } from './ncbitaxonomy.mjs';
+import { serializeTree, unserializeTree, idx_to_rank, rank_to_idx } from './ncbitaxonomy.mjs';
 import FileCache from './filecache.mjs';
 import { convertToQueryUrl } from './utils.mjs';
 
@@ -358,7 +358,14 @@ app.get('/api/cluster/:cluster/annotations', async (req, res) => {
 function makeSankey(result) {
     let nodes = {};
     let links = {};
-    const allowedRanks = [28, 27, 24, 12, 8, 4];
+    // Was the magic list [28, 27, 24, 12, 8, 4]. Name the ranks instead, so this cannot
+    // drift out of step with rank_to_idx, and include the ranks NCBI now uses at the top
+    // of the viral tree: Viruses is an "acellular root", not a "superkingdom", which is
+    // why it was missing from the diagram entirely.
+    const allowedRanks = ['acellular root', 'superkingdom', 'realm', 'kingdom',
+                          'phylum', 'family', 'genus', 'species']
+        .map((r) => rank_to_idx[r])
+        .filter((r) => r !== undefined);
     result.forEach((x) => {
         if (tree.nodeExists(x.tax_id) == false) {
             return;

@@ -8,19 +8,21 @@
 #   taxonomy-parent_child.tsv    parent, child
 #
 #   flag        1 = ColabFold-AF2, 2 = ESMFold+ProteinTTT_MSA
-#   lca_tax_id  LCA of the cluster's member taxids over the NCBI tree (0 if none resolve)
+#   lca_tax_id  read from make_lca.sh's output, which uses `mmseqs lca` over the
+#               sequence clustering -- not computed here
 #   'NA'        every absent ICTV value, never NULL or ''
 #
 # No ictv_species column: resolved to its species-rank ancestor, the NCBI scientific
 # name equals the ICTV species for 176,302 of 176,330 mapped taxids (100.0%), so the
 # entry page reads species off the NCBI tree instead.
 #
-# Usage: build_tables.sh <bfvd2-root> <taxdump-dir> <out-dir>
+# Usage: build_tables.sh <bfvd2-root> <taxdump-dir> <out-dir> <lca.tsv>
 set -euo pipefail
 
 B="${1:?bfvd2 root}"
 TAX="${2:?taxdump dir with nodes.dmp/merged.dmp}"
 OUT="${3:?out dir}"
+LCA="${4:?lca tsv from make_lca.sh}"
 A="$B/analyses"
 
 SEQCLU="$B/work/cluster/bfvd_v2_seqclu.tsv"
@@ -35,7 +37,7 @@ MERGED="$TAX/merged.dmp"
 ROOT=10239
 
 for f in "$SEQCLU" "$SCORES" "$LENGTHS" "$TAXIDS" "$ICTV_MAP" "$ICTV_ACC" \
-         "$ICTV_HOST" "$NODES" "$MERGED"; do
+         "$ICTV_HOST" "$NODES" "$MERGED" "$LCA"; do
     [ -f "$f" ] || { echo "missing input: $f" >&2; exit 1; }
 done
 mkdir -p "$OUT"
@@ -72,56 +74,34 @@ gawk -F'\t' '
   "$LENGTHS" "$SCORES" "$TAXIDS" "$SEQCLU" > "$OUT/entry.tsv"
 
 # ---------------------------------------------------------------- cluster.tsv
-# Grouped by cluster_id, so members of a cluster arrive together and only one
-# cluster is held in memory at a time. LCA walks the NCBI tree, caching each
-# taxid's root path as a delimited string.
-say "cluster.tsv (grouping + LCA)"
-LC_ALL=C sort -k6,6 "$OUT/entry.tsv" | gawk -F'\t' '
-    BEGIN { RS = "\r?\n" }
-    function canon(t) {
-        if (t in parent) return t
-        if (t in merged && merged[t] in parent) return merged[t]
-        return 0
-    }
-    function path(t,   p, cur, i) {
-        if (t in anc) return anc[t]
-        p = "|"; cur = t; i = 0
-        while (cur != "" && i < 100) {
-            p = p cur "|"
-            if (cur == 1) break
-            cur = (cur in parent ? parent[cur] : "")
-            i++
+# Grouped by cluster_id so only one cluster is resident at a time. The LCA is joined in
+# from make_lca.sh (`mmseqs lca`) rather than recomputed here.
+say "cluster.tsv (aggregates + LCA from mmseqs)"
+LC_ALL=C sort -k6,6 "$OUT/entry.tsv" | gawk -F'\t' -v lca="$LCA" '
+    BEGIN {
+        RS = "\r?\n"
+        while ((getline line < lca) > 0) {
+            split(line, a, "\t")
+            tax[a[1]] = a[2]
         }
-        anc[t] = p
-        return p
     }
-    function lca2(a, b,   pb, k, node) {
-        if (a == 0) return b
-        if (b == 0) return a
-        split(path(b), pb, "|")
-        for (k = 2; k in pb; k++) {
-            node = pb[k]
-            if (node != "" && index(path(a), "|" node "|") > 0) return node
-        }
-        return 1
-    }
-    function flush(   avg_l, avg_p) {
+    function flush() {
         if (n == 0) return
-        printf "%s\t%d\t%.2f\t%.4f\t%d\t%d\n", cid, n, tot_l / n, tot_p / n, (n == 1), best
+        printf "%s\t%d\t%.2f\t%.4f\t%d\t%d\n", cid, n, tot_l / n, tot_p / n, (n == 1),
+               (cid in tax ? tax[cid] : 0)
+        if (!(cid in tax)) miss++
         nc++
     }
-    FILENAME == NOD { split($0, a, /\t\|\t/); parent[a[1]] = a[2]; next }
-    # merged.dmp has only two fields, so the value keeps a trailing "\t|";
-    # +0 coerces it to the bare taxid.
-    FILENAME == MRG { split($0, a, /\t\|\t/); merged[a[1]] = a[2] + 0; next }
     {
-        if ($6 != cid) { flush(); cid = $6; n = 0; tot_l = 0; tot_p = 0; best = 0 }
+        if ($6 != cid) { flush(); cid = $6; n = 0; tot_l = 0; tot_p = 0 }
         n++; tot_l += $2; tot_p += $3
-        t = canon($4 + 0)
-        if (t) best = lca2(best, t)
     }
-    END { flush(); printf("  clusters %d\n", nc) > "/dev/stderr" }
-' NOD="$NODES" MRG="$MERGED" "$NODES" "$MERGED" - > "$OUT/cluster.tsv"
+    END {
+        flush()
+        printf("  clusters %d, without an LCA %d\n", nc, miss+0) > "/dev/stderr"
+        if (miss > 0) print "  WARNING: clusters missing from the LCA table got 0" > "/dev/stderr"
+    }
+' > "$OUT/cluster.tsv"
 
 # ---------------------------------------------------------------- ictv.tsv
 say "ictv.tsv"

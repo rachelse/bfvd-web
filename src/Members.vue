@@ -39,16 +39,14 @@
 <template v-slot:content>
     <template v-if="$route.params.cluster">
     <Sankey :cluster="cluster" type="members" @select="sankeySelect"></Sankey>
-    <v-data-table
+    <v-data-table-server
         :headers="headers"
         :items="members"
         v-model:page="options.page"
         v-model:items-per-page="options.itemsPerPage"
-        :server-items-length="totalMembers"
+        :items-length="totalMembers"
         :loading="loading"
-        :footer-props="{
-            'items-per-page-options': [10, 20, 50, 100, -1],
-        }"
+        :items-per-page-options="[10, 20, 50, 100]"
     >
         <template v-slot:item.accession="prop">
             <ExternalLinks :accession="prop.value"></ExternalLinks><br>
@@ -128,7 +126,7 @@
                 <v-img :src="require('./assets/marv-foldseek-small.png')" max-width="16"></v-img>
             </v-chip>
         </template> -->
-    </v-data-table>
+    </v-data-table-server>
     </template>
 </template>
 </Panel>
